@@ -6,10 +6,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/afb20119b330
 import "./X721.sol";
 
 contract Fund is Ownable {
-  struct Company{
-    string index;
-    string name;
-  }
 
   struct Stake {
     address from;
