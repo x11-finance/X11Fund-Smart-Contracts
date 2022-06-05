@@ -6,6 +6,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/afb20119b330
 import "./X721.sol";
 
 contract Fund is Ownable {
+  struct Company{
+    string index;
+    string name;
+  }
 
   struct Stake {
     address from;
@@ -129,10 +133,12 @@ contract Fund is Ownable {
   function addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
     require(_tokenamount > GetAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 6000*10e18, "6000 is necessary to open the pool.");
-    
-    token.transfer(address(this), _tokenamount);
+    return _addStakeHolderInPool(_poolId, _tokenamount);
+  }
+
+  function _addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
-    //canVote[msg.sender].push(CanVote(poolId, block.timestamp));
+    token.transfer(address(this), _tokenamount);
     emit Staked(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
   }
@@ -161,9 +167,13 @@ contract Fund is Ownable {
     
     require(idInPool >= 0, "You're not in this pool!");
     require(initStakes[_poolId][uint256(idInPool)].since + 30 days <= block.timestamp, "You can unstake in 1 month only");
-    
-    token.transferFrom(address(this), msg.sender, initStakes[_poolId][uint256(idInPool)].tokenamount);
-    emit Unstaked(msg.sender, initStakes[_poolId][uint256(idInPool)].tokenamount, _poolId, block.timestamp);
+   
+    return _claimInitStakeFromPool(_poolId, idInPool);
+  }
+
+  function _claimInitStakeFromPool(uint256 _poolId, int256 _idInPool) internal returns(bool) {
+    token.transferFrom(address(this), msg.sender, initStakes[_poolId][uint256(_idInPool)].tokenamount);
+    emit Unstaked(msg.sender, initStakes[_poolId][uint256(_idInPool)].tokenamount, _poolId, block.timestamp);
     return true;
   }
 
@@ -171,6 +181,10 @@ contract Fund is Ownable {
     require(_tokenamount > GetBUSDAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 1000*10e18, "1000 is necessary to open the pool.");
     
+    return _addStakeHolderInPool(_poolId, _tokenamount);
+  }
+
+   function _addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     busd.transfer(address(this), _tokenamount);
     // TODO: check!
     _tokenamount -= _tokenamount * 2 / 100;
@@ -224,7 +238,10 @@ contract Fund is Ownable {
   /// Fund pool with BUSD
   function fundPool(uint256 _poolId, uint256 _tokenamount) public onlyOwner {
     require(_tokenamount > GetBUSDAllowance(), "Please approve tokens before transferring.");
-    
+    _fundPool(_poolId, _tokenamount);
+  }
+
+  function _fundPool(uint256 _poolId, uint256 _tokenamount) internal {
     pools[_poolId].funded += _tokenamount;
     busd.transfer(address(this), _tokenamount);
     
@@ -269,7 +286,11 @@ contract Fund is Ownable {
 
   function castVote(uint256 _poolId, bool _vote) public {
     require (_canVote(msg.sender, _poolId), "Not eligible for voting");
+    _castVote(_poolId, _vote);
+  } 
+
+  function _castVote(uint256 _poolId, bool _vote) internal {
     votes.push(Vote(msg.sender, _poolId, _vote));
     canVote[msg.sender][_poolId].isTrue = false;
-  } 
+  }
 }
