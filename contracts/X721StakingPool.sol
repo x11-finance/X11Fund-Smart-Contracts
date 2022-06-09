@@ -173,7 +173,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     }
 
     // 10e8
-    function setRateToUSD(uint256 _rate) public {
+    function setRateToUSD(uint256 _rate) public onlyOwner {
         x11RateToUSD = _rate;
     }
 }
