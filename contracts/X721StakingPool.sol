@@ -44,6 +44,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     event Unstaked(address indexed user, uint256 tokenId);
     event RewardPaid(address indexed user, uint256 reward);
     event EmergencyUnstake(address indexed user, uint256 tokenId);
+    event ClaimableStatusUpdated(bool isEnabled);
 
     /* ========== METHODS ========== */
     

@@ -46,6 +46,8 @@ contract("Fund", function (accounts) {
       { from: accounts[0] }
     );
     balance = await this.token.balanceOf(accounts[0]);
+    balanceOfInstance = await this.token.balanceOf(this.instance.address);
+    assert.equal(balanceOfInstance.toString(), "6000000000000000000000");
     return assert.equal(balance.toString(), "9999994000000000000000000000");
   });
 });
