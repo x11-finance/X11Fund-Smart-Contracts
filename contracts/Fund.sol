@@ -46,7 +46,7 @@ contract Fund is Ownable {
     bool isTrue;
   }
   
-  IERC20 token;
+  IERC20 public token;
   IERC20 busd;
   X721 x721;
 
@@ -88,14 +88,14 @@ contract Fund is Ownable {
   }
 
   function addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
-    require(_tokenamount > GetAllowance(), "Please approve tokens before transferring.");
-    require(_tokenamount >= 6000*10e18, "6000 is necessary to open the pool.");
+    require(_tokenamount <= GetAllowance(), "Please approve tokens before transferring.");
+    require(_tokenamount >= 6000, "6000 is necessary to open the pool.");
     return _addStakeHolderInPool(_poolId, _tokenamount);
   }
 
   function _addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
-    token.transfer(address(this), _tokenamount);
+    token.transferFrom(msg.sender, address(this), _tokenamount);
     emit Staked(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
   }
@@ -114,7 +114,7 @@ contract Fund is Ownable {
   }
 
   function addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
-    require(_tokenamount > GetBUSDAllowance(), "Please approve tokens before transferring.");
+    require(_tokenamount <= GetBUSDAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 1000*10e18, "1000 is necessary to open the pool.");
     require(pools[_poolId].isActive, "The pool is killed.");
     
