@@ -19,7 +19,7 @@ contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable {
     }
     mapping(uint256 => Metadata2) tokensData;
 
-    constructor() ERC721("X721", "X721") {}
+    constructor() ERC721("xUSD", "xUSD") {}
 
     function pause() public onlyOwner {
         _pause();
