@@ -108,14 +108,14 @@ contract Fund is Ownable {
   }
 
   function _claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) internal returns(bool) {
-    token.transferFrom(address(this), msg.sender, initStakes[_poolId][uint256(_idInPool)].tokenamount);
+    token.transferFrom(address(this), initStakes[_poolId][uint256(_idInPool)].from, initStakes[_poolId][uint256(_idInPool)].tokenamount);
     emit Unstaked(msg.sender, initStakes[_poolId][uint256(_idInPool)].tokenamount, _poolId, block.timestamp);
     return true;
   }
 
   function addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
     require(_tokenamount <= GetBUSDAllowance(), "Please approve tokens before transferring.");
-    require(_tokenamount >= 1000*10e18, "1000 is necessary to open the pool.");
+    require(_tokenamount >= 1000, "1000 is necessary to open the pool.");
     require(pools[_poolId].isActive, "The pool is killed.");
     
     return _addStakeHolderInPool(_poolId, _tokenamount);
