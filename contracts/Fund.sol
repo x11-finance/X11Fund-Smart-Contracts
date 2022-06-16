@@ -142,6 +142,7 @@ contract Fund is Ownable {
 
   function castVote(uint256 _poolId, bool _vote) public {
     require (_canVote(msg.sender, _poolId), "Not eligible for voting");
+    require (votings[_poolId].isActive, "Voting finished");
     _castVote(_poolId, _vote);
   } 
 

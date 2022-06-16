@@ -122,6 +122,13 @@ contract("Fund", function (accounts) {
     return assert.equal(diff, web3.utils.toWei("10000.0", "ether"));
   });
 
+  it("shouldn't allow members to vote when the voting is closed", async function () {
+    let votingsAmount = await this.instance.getVotingsAmount();
+    await this.instance.closeVoting(0, votingsAmount, { from: accounts[0] });
+    //return assert.isTrue(true);
+    truffleAssert.fails(this.instance.castVote(0, true, { from: accounts[0] }));
+  });
+
   it("shouldn't allow the user to add a BUSD stake in the amount of less than 1K", async function () {
     await this.busd.approve(
       this.instance.address,
