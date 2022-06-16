@@ -183,13 +183,13 @@ contract Fund is Ownable {
 
   /// Fund pool with BUSD
   function fundPool(uint256 _poolId, uint256 _tokenamount) public onlyOwner {
-    require(_tokenamount > GetBUSDAllowance(), "Please approve tokens before transferring.");
+    require(_tokenamount <= GetBUSDAllowance(), "Please approve tokens before transferring.");
     _fundPool(_poolId, _tokenamount);
   }
 
   function _fundPool(uint256 _poolId, uint256 _tokenamount) internal {
     pools[_poolId].funded += _tokenamount;
-    busd.transfer(address(this), _tokenamount);
+    busd.transferFrom(msg.sender, address(this), _tokenamount);
     
     emit PoolFunded(_poolId, _tokenamount);
   }

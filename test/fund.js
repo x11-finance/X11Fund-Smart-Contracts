@@ -107,6 +107,21 @@ contract("Fund", function (accounts) {
     );
   });
 
+  it("should fund the pool", async function () {
+    let unfunded = await this.busd.balanceOf(this.instance.address);
+    await this.busd.approve(
+      this.instance.address,
+      web3.utils.toWei("10000.0", "ether"),
+      { from: accounts[0] }
+    );
+    await this.instance.fundPool(0, web3.utils.toWei("10000.0", "ether"), {
+      from: accounts[0],
+    });
+    let funded = await this.busd.balanceOf(this.instance.address);
+    let diff = funded - unfunded;
+    return assert.equal(diff, web3.utils.toWei("10000.0", "ether"));
+  });
+
   it("shouldn't allow the user to add a BUSD stake in the amount of less than 1K", async function () {
     await this.busd.approve(
       this.instance.address,
