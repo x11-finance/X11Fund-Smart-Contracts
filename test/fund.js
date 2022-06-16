@@ -1,6 +1,6 @@
 const Fund = artifacts.require("Fund");
 const Token = artifacts.require("X11");
-const BUSD = artifacts.require("X11");
+const BUSD = artifacts.require("BUSD");
 const XUSD = artifacts.require("X721");
 
 const truffleAssert = require("truffle-assertions");
@@ -62,9 +62,10 @@ contract("Fund", function (accounts) {
 
   it("should allow the user to add a BUSD stake", async function () {
     let balance = await this.busd.balanceOf(accounts[0]);
+    //console.log(balance.toString());
     await this.busd.approve(
       this.instance.address,
-      web3.utils.toWei("5000.0", "ether"),
+      web3.utils.toWei("10000.0", "ether"),
       { from: accounts[0] }
     );
     let allowance = await this.instance.GetBUSDAllowance();
@@ -76,9 +77,28 @@ contract("Fund", function (accounts) {
     );
 
     balance = await this.instance.GetUserBUSDBalance({ from: accounts[0] });
-    balanceOfInstance = await this.busd.balanceOf(this.instance.address);
+    let balanceOfInstance = await this.busd.balanceOf(this.instance.address);
+    //console.log(balance.toString());
 
-    return assert.equal(balance.toString(), "9999989000000000000000000000");
+    let canvote = await this.instance.getTotalBUSDStakes();
+    //console.log("Stakes: ", canvote.toString());
+
+    return assert.equal(balance.toString(), "9999995000000000000000000000");
+  });
+
+  it("should allow members to vote", async function () {
+    await this.instance.startVoting(0, { from: accounts[0] });
+    await this.instance.castVote(0, true, { from: accounts[0] });
+
+    let votes = await this.instance.getVotes(0);
+
+    return assert.equal(votes.toNumber(), 1);
+  });
+
+  it("shouldn't allow non-members to vote", async function () {
+    return truffleAssert.fails(
+      this.instance.castVote(0, true, { from: accounts[1] })
+    );
   });
 
   it("shouldn't allow the user to add a BUSD stake in the amount of less than 1K", async function () {
@@ -89,7 +109,7 @@ contract("Fund", function (accounts) {
     );
 
     truffleAssert.fails(
-      this.instance.addBUSDStakeInPool(0, web3.utils.toWei("5000.0", "ether"), {
+      this.instance.addBUSDStakeInPool(0, web3.utils.toWei("500.0", "ether"), {
         from: accounts[0],
       })
     );

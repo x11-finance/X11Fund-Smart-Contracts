@@ -118,14 +118,14 @@ contract Fund is Ownable {
     require(_tokenamount >= 1000, "1000 is necessary to open the pool.");
     require(pools[_poolId].isActive, "The pool is killed.");
     
-    return _addStakeHolderInPool(_poolId, _tokenamount);
+    return _addBUSDStakeInPool(_poolId, _tokenamount);
   }
 
   function _addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
-    busd.transfer(address(this), _tokenamount);
+    busd.transferFrom(msg.sender, address(this), _tokenamount);
     busdStakes.push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
-    x721.mintNFT(msg.sender, _poolId, _tokenamount);
+    //x721.mintNFT(msg.sender, _poolId, _tokenamount);
     emit Staked(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
   }
@@ -247,7 +247,7 @@ contract Fund is Ownable {
     return votes.length;
   }
 
-  function _canVote(address _user, uint256 _poolId) internal view returns (bool) {
+  function _canVote(address _user, uint256 _poolId) public view returns (bool) {
     for (uint256 i = 0; i < canVote[_user].length; i++) {
       if (canVote[_user][i].poolId == _poolId) {
         return true;

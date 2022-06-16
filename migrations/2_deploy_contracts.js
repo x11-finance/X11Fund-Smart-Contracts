@@ -1,7 +1,7 @@
 const Fund = artifacts.require("Fund");
 const ERC721Staking = artifacts.require("ERC721Staking");
 const X11 = artifacts.require("X11");
-const BUSD = artifacts.require("X11");
+const BUSD = artifacts.require("BUSD");
 const X721 = artifacts.require("X721");
 
 module.exports = async function (deployer) {
