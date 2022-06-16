@@ -170,7 +170,7 @@ contract Fund is Ownable {
   /// Call only when the contract is funded
   function withdrawRewards(uint256 _poolId, uint256 _busdStakesAmount) public onlyOwner {
     Stake storage stake = busdStakes[0];
-  
+
     for (uint256 i = 0; i < _busdStakesAmount; i++) {
       if (busdStakes[i].poolId == _poolId) {
         uint256 unclaimedReward = stake.rewards - stake.claimedRewards;
@@ -209,7 +209,7 @@ contract Fund is Ownable {
 
   function closePool(uint256 _poolId, uint256 _busdStakesAmount, uint256 _totalStakedInPool) public onlyOwner {
     require(pools[_poolId].funded > 0, "Please fund the pool first.");
-
+ 
     for (uint256 i = 0; i < _busdStakesAmount; i++) {
       if (busdStakes[i].poolId == _poolId) {
         busdStakes[i].tokenamount -= 2 * busdStakes[i].tokenamount / 100;

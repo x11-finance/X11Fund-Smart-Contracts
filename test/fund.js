@@ -130,11 +130,26 @@ contract("Fund", function (accounts) {
 
   it("should calculate, update and distribute the rewards", async function () {
     let balanceBefore = await this.busd.balanceOf(accounts[0]);
-    console.log(balanceBefore);
     let poolsAmount = await this.instance.getTotalPools();
     let busdStakesAmount = await this.instance.getTotalBUSDStakes();
-    truffleAssert.passes(
-      this.instance.updateRewards(poolsAmount, busdStakesAmount)
+    await this.instance.updateRewards(poolsAmount, busdStakesAmount);
+    await this.instance.ApproveBUSD(
+      web3.utils.toWei("1000000000000000.0", "ether")
+    );
+    let busdAllowance = await this.instance.GetBUSDAllowance();
+    let thisAllowance = await this.busd.allowance(
+      this.instance.address,
+      this.instance.address
+    );
+    await this.instance.withdrawRewards(0, busdStakesAmount, {
+      from: accounts[0],
+    });
+    let balanceAfter = await this.busd.balanceOf(accounts[0]);
+    let diff = balanceAfter.sub(balanceBefore);
+
+    return assert.equal(
+      diff.toString(),
+      web3.utils.toWei("10000.0", "ether").toString()
     );
   });
 
