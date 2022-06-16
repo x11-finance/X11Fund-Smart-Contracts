@@ -125,8 +125,17 @@ contract("Fund", function (accounts) {
   it("shouldn't allow members to vote when the voting is closed", async function () {
     let votingsAmount = await this.instance.getVotingsAmount();
     await this.instance.closeVoting(0, votingsAmount, { from: accounts[0] });
-    //return assert.isTrue(true);
     truffleAssert.fails(this.instance.castVote(0, true, { from: accounts[0] }));
+  });
+
+  it("should calculate, update and distribute the rewards", async function () {
+    let balanceBefore = await this.busd.balanceOf(accounts[0]);
+    console.log(balanceBefore);
+    let poolsAmount = await this.instance.getTotalPools();
+    let busdStakesAmount = await this.instance.getTotalBUSDStakes();
+    truffleAssert.passes(
+      this.instance.updateRewards(poolsAmount, busdStakesAmount)
+    );
   });
 
   it("shouldn't allow the user to add a BUSD stake in the amount of less than 1K", async function () {
