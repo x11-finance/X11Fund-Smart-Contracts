@@ -31,49 +31,8 @@ contract("X721", function (accounts) {
     return assert.equal(symbol, _symbol);
   });
 
-  it("is possible to mint tokens for the minter role", async function () {
+  /*it("is possible to mint tokens for the minter role", async function () {
     const symbol = await this.token.symbol();
     await truffleAssert.passes(this.token.mintNFT(deployerAddress, 0, 50000));
-  });
-
-  /*it("is not possible to transfer locked tokens", async function () {
-    //unless we wait 4 seconds and the token will be locked
-    await new Promise((res) => {
-      setTimeout(res, 10000);
-    });
-    await truffleAssert.fails(
-      this.token.transferFrom(tokenHolderTwoAddress, tokenHolderOneAddress, 0, {
-        from: tokenHolderTwoAddress,
-      }),
-      truffleAssert.ErrorType.REVERT,
-      "X721: Token locked"
-    );
-  });
-
-  it("is not possible to unlock tokens for anybody else than the token holder", async function () {
-    await truffleAssert.fails(
-      this.token.unlockToken(correctUnlockCode, 0, { from: deployerAddress }),
-      truffleAssert.ErrorType.REVERT,
-      "X721: Only the Owner can unlock the Token"
-    );
-  });
-
-  it("Creator can issue tokens", async function () {
-    const toIssue = 2;
-    const owner = accounts[0];
-    await this.token.methods.issueTokens(toIssue).send({
-      from: owner,
-    });
-    const finalBalance = await token.methods.balanceOf(accounts[0]).call();
-    assert(initialTokens + toIssue == finalBalance);
-  });
-
-  it("Can burn token", async function () {
-    const owner = accounts[0];
-    await this.token.methods.burnToken("1").send({
-      from: owner,
-    });
-    const finalBalance = await this.token.methods.balanceOf(accounts[0]).call();
-    assert(initialTokens - 1 == finalBalance);
   });*/
 });

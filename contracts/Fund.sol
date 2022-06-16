@@ -125,7 +125,7 @@ contract Fund is Ownable {
     busd.transferFrom(msg.sender, address(this), _tokenamount);
     busdStakes.push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
-    //x721.mintNFT(msg.sender, _poolId, _tokenamount);
+    x721.mintNFT(msg.sender, _poolId, _tokenamount);
     emit Staked(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
   }

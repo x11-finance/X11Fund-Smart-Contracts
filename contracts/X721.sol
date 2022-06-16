@@ -7,11 +7,14 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable {
+
+contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable, AccessControl {
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     struct Metadata2 {
         uint256 poolId;
@@ -19,7 +22,9 @@ contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable {
     }
     mapping(uint256 => Metadata2) tokensData;
 
-    constructor() ERC721("xUSD", "xUSD") {}
+    constructor() ERC721("xUSD", "xUSD") {
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
 
     function pause() public onlyOwner {
         _pause();
@@ -46,13 +51,15 @@ contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable {
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, ERC721Enumerable)
+        override(ERC721, ERC721Enumerable, AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
 
-    function mintNFT(address client, uint256 poolId, uint256 amount) public onlyOwner returns (uint256) {
+    function mintNFT(address client, uint256 poolId, uint256 amount) public returns (uint256) {
+        require(hasRole(MINTER_ROLE, msg.sender), "Caller is not a minter");
+        
         _tokenIdCounter.increment();
 
         uint256 newItemId = _tokenIdCounter.current();

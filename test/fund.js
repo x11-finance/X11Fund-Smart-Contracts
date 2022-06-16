@@ -18,6 +18,11 @@ contract("Fund", function (accounts) {
       this.busd.address,
       this.xUSD.address
     );
+    await this.xUSD.grantRole(
+      "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6",
+      this.instance.address,
+      { from: accounts[0] }
+    );
   });
 
   it("should deploy", async function () {
@@ -63,6 +68,7 @@ contract("Fund", function (accounts) {
   it("should allow the user to add a BUSD stake", async function () {
     let balance = await this.busd.balanceOf(accounts[0]);
     //console.log(balance.toString());
+
     await this.busd.approve(
       this.instance.address,
       web3.utils.toWei("10000.0", "ether"),
