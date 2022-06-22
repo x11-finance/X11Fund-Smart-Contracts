@@ -20,10 +20,17 @@ contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable, Ac
         uint256 poolId;
         uint256 amount;
     }
-    mapping(uint256 => Metadata2) tokensData;
+    mapping(uint256 => Metadata2) tokensData; // id => data
+
+    /* ========== EVENTS ========== */
+
+    event Minted(address indexed user, uint256 poolId, uint256 amount, uint256 tokenId);
+
+    /* ========== METHODS ========== */
 
     constructor() ERC721("xUSD", "xUSD") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(MINTER_ROLE, msg.sender);
     }
 
     function pause() public onlyOwner {
@@ -61,12 +68,12 @@ contract X721 is ERC721, ERC721Enumerable, Pausable, Ownable, ERC721Burnable, Ac
         require(hasRole(MINTER_ROLE, msg.sender), "Caller is not a minter");
         
         _tokenIdCounter.increment();
-
         uint256 newItemId = _tokenIdCounter.current();
-        _mint(client, newItemId);
-
         tokensData[newItemId] = Metadata2(poolId, amount);
 
+        _mint(client, newItemId);
+        emit Minted(client, poolId, amount, newItemId);
+        
         return newItemId;
     }
 
