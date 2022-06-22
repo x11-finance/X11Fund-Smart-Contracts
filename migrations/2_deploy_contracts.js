@@ -8,6 +8,6 @@ module.exports = async function (deployer) {
   await deployer.deploy(X11);
   await deployer.deploy(X721);
   await deployer.deploy(BUSD);
-  await deployer.deploy(ERC721Staking);
+  await deployer.deploy(ERC721Staking, X721.address, X11.address);
   await deployer.deploy(Fund, X11.address, BUSD.address, X721.address);
 };

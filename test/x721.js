@@ -12,11 +12,6 @@ contract("X721", function (accounts) {
   const [deployerAddress, tokenHolderOneAddress, tokenHolderTwoAddress] =
     accounts;
 
-  let correctUnlockCode = web3.utils.sha3("test"); //test is the password
-  let timestampLockedFrom = Math.round(Date.now() / 1000) + 3; //lock it in 3 seconds to test unlock
-  let unlockCodeHash = web3.utils.sha3(correctUnlockCode); //double hashed
-  let initialTokens = 0;
-
   beforeEach(async function () {
     this.token = await X721.new();
   });
@@ -48,6 +43,24 @@ contract("X721", function (accounts) {
     let poolId = await this.token.getPoolId(tokenId);
 
     assert.equal(peggedAmount.toString(), "50000");
-    assert.equal(poolId.toString(), "1");
+    return assert.equal(poolId.toString(), "1");
+  });
+
+  it("can retrive balance of tokens of a user and can trace the owner", async function () {
+    await this.token.mintNFT(deployerAddress, 0, 20000, {
+      from: accounts[0],
+    });
+    let tx = await this.token.mintNFT(deployerAddress, 1, 30000, {
+      from: accounts[0],
+    });
+
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    const balance = await this.token.balanceOf(accounts[0]);
+    const owner = await this.token.ownerOf(tokenId);
+
+    assert.equal(balance.toNumber(), 2);
+    return assert.equal(owner, accounts[0]);
   });
 });

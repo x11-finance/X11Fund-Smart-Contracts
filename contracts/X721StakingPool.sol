@@ -28,14 +28,14 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     address[] users;
     bool public tokensClaimable;
     bool initialised;
+    uint256 stakingStartTime;
 
     X721 public stakedToken;
     IERC20 public rewardToken;
     uint256 public totalStaked;
+    uint256 public x11RateToUSD;
     uint256 constant stakingTime = 1 days;
     uint256 constant token = 10e18;
-    uint256 stakingStartTime;
-    uint256 public x11RateToUSD;
 
     /* ========== EVENTS ========== */
 
@@ -47,6 +47,11 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     event ClaimableStatusUpdated(bool isEnabled);
 
     /* ========== METHODS ========== */
+
+    constructor(address _stakedToken, address _rewardToken) {
+        stakedToken = X721(_stakedToken);
+        rewardToken = IERC20(_rewardToken);   
+    }
     
     function initStaking() public onlyOwner {
         require(!initialised, "Already initialized");
@@ -64,22 +69,21 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     }
 
     function stake(uint256 tokenId) public {
+        require(initialised, "The staking has not started.");
+        require(stakedToken.ownerOf(tokenId) == msg.sender, "User must own the token.");
+
         _stake(msg.sender, tokenId);
     }
 
     function _stake(address _user, uint256 _tokenId) internal {
-        require(initialised, "The staking has not started.");
-        require(stakedToken.ownerOf(_tokenId) == _user, "User must own the token.");
-
         Stake storage __stake = stakes[_user];
         __stake.tokenIds.push(_tokenId);
-        //__stake.tokenStakingCoolDown[_tokenId] = block.timestamp;
+       
         if(__stake.tokenIds.length <= 1) {
             __stake.balance = 0;
         }
         __stake.balance += stakedToken.peggedAmount(_tokenId);
         tokenOwner[_tokenId] = _user;
-        stakedToken.approve(address(this), _tokenId);
         stakedToken.safeTransferFrom(_user, address(this), _tokenId);
         stakedTokens.push(_tokenId); 
         users.push(_user);
@@ -148,7 +152,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
             Stake storage __stake = stakes[users[i]];
             uint256[] storage ids = __stake.tokenIds;
             for (uint256 j = 0; j < ids.length; j++) {
-                uint256 stakedDays = ((block.timestamp - uint(__stake.since))) / stakingTime;
+                uint256 stakedDays = 30;//((block.timestamp - uint(__stake.since))) / stakingTime;
                 uint256 tier = getInvestmentTier(ids[j]);
                 if (j == 0) {
                     __stake.rewards = 0;
@@ -159,15 +163,16 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         }
     }
 
-    function claimReward(address _user) public {
+    function claimReward(address _user) public returns (uint256) {
         uint256 unclaimedReward = stakes[_user].rewards - stakes[_user].claimedRewards;
         require(tokensClaimable == true, "Tokens cannnot be claimed yet");
         require(unclaimedReward > 0 , "0 rewards yet");
 
         stakes[_user].claimedRewards += unclaimedReward;
-        rewardToken.transferFrom(address(this), msg.sender, unclaimedReward);
+        //rewardToken.transferFrom(address(this), msg.sender, unclaimedReward);
 
         emit RewardPaid(_user, unclaimedReward);
+        return unclaimedReward;
     }
 
     // 10e8
