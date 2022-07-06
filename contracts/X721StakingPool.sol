@@ -15,7 +15,6 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
 
     struct Stake {
         uint256[] tokenIds;
-        //uint256 tokenamount;
         uint256 since;
         uint256 balance;
         uint256 rewards;
@@ -91,7 +90,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         emit Staked(_user, 1, _tokenId);
     }
 
-    function unstake(uint256 _tokenId) public {
+    function unstake(uint256 _tokenId) public nonReentrant {
         claimReward(msg.sender);
         _unstake(msg.sender, _tokenId);
     }
@@ -116,7 +115,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         if (__stake.tokenIds.length > 0) {
             __stake.tokenIds.pop();
         }
-        //__stake.tokenStakingCoolDown[_tokenId] = 0;
+       
         if(__stake.balance == 0) {
             delete stakes[_user];
         }

@@ -28,6 +28,7 @@ contract("ERC721Staking", function (accounts) {
     let stakingPool = await X721StakingPool.deployed(xUSD.address, x11.address);
 
     await stakingPool.initStaking({ from: accounts[0] });
+    await stakingPool.setTokensClaimable(true);
 
     let tx = await xUSD.mintNFT(accounts[0], 1, 50000, {
       from: accounts[0],
