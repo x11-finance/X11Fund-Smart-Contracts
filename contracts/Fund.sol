@@ -57,6 +57,8 @@ contract Fund is Ownable, ReentrancyGuard {
     bool isTrue;
   }
   
+  uint256 internal constant initStakePeriod = 30 days;
+
   IERC20 public token;
   IERC20 busd;
   X721 x721;
@@ -103,7 +105,7 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
     require(_tokenamount <= GetAllowance(), "Please approve tokens before transferring.");
-    require(_tokenamount >= 6000, "6000 is necessary to open the pool.");
+    require(_tokenamount >= 6000000000000000000000, "6000 is necessary to open the pool.");
     return _addStakeHolderInPool(_poolId, _tokenamount);
   }
 
@@ -116,12 +118,15 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) public returns(bool) {
     require(_idInPool >= 0, "You're not in this pool!");
-    require(initStakes[_poolId][uint256(_idInPool)].since + 30 days <= block.timestamp, "You can unstake in 1 month only");
-   
+    require(initStakes[_poolId][uint256(_idInPool)].since + initStakePeriod <= block.timestamp, "You can unstake in 1 month only");
+    require(initStakes[_poolId][uint256(_idInPool)].from == msg.sender);
+    require(initStakes[_poolId][uint256(_idInPool)].claimedRewards == 0);
+
     return _claimInitStakeFromPool(_poolId, _idInPool);
   }
 
   function _claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) internal returns(bool) {
+    initStakes[_poolId][uint256(_idInPool)].claimedRewards = initStakes[_poolId][uint256(_idInPool)].tokenamount;
     token.transferFrom(address(this), initStakes[_poolId][uint256(_idInPool)].from, initStakes[_poolId][uint256(_idInPool)].tokenamount);
     emit UnstakedInit(msg.sender, initStakes[_poolId][uint256(_idInPool)].tokenamount, _poolId, block.timestamp);
     return true;
@@ -129,7 +134,7 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
     require(_tokenamount <= GetBUSDAllowance(), "Please approve tokens before transferring.");
-    require(_tokenamount >= 1000, "1000 is necessary to open the pool.");
+    require(_tokenamount >= 1000000000000000000000, "1000 is necessary to open the pool.");
     require(pools[_poolId].isActive, "The pool is killed.");
     
     return _addBUSDStakeInPool(_poolId, _tokenamount);
@@ -184,13 +189,13 @@ contract Fund is Ownable, ReentrancyGuard {
   /* ========== ADMIN METHODS ========== */
 
   /// Call only when the contract is funded
-  function updateRewards(uint256 _poolsAmount, uint256 _busdStakesAmount) public onlyOwner {
+  function updateRewards(uint256 _poolsAmount, uint256 from, uint256 to) public onlyOwner {
     for (uint256 i = 0; i < _poolsAmount; i++) {
       if (pools[i].funded == 0) {
         continue;
       }
       uint256 totalStakedInCurrentPool = totalStakedInPool(pools[i].number);
-      for (uint256 j = 0; j < _busdStakesAmount; j++) {
+      for (uint256 j = from; j < to; j++) {
         if (busdStakes[j].poolId == pools[i].number && pools[i].funded > 0) {
           uint256 part = busdStakes[j].tokenamount * 10e8 / totalStakedInCurrentPool;
           busdStakes[j].rewards = pools[i].funded * part / 10e8;
