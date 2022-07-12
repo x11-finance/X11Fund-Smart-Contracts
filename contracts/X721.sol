@@ -72,7 +72,7 @@ contract X721 is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable, 
         uint256 newItemId = _tokenIdCounter.current();
         tokensData[newItemId] = Metadata2(poolId, amount);
 
-        _setTokenURI(newItemId, formatTokenUri(poolId, amount);
+        _setTokenURI(newItemId, formatTokenUri(poolId, amount));
         _mint(client, newItemId);
         emit Minted(client, poolId, amount, newItemId);
         
