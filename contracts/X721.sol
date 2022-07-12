@@ -88,7 +88,7 @@ contract X721 is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable, 
                     Base64.encode(
                         bytes(
                             abi.encodePacked(
-                                '{"name": "xUSD", "description": "A token representing the stake.", "poolId": _poolId, "tokenAmount": _tokenAmount, '}'
+                                '{"name": "xUSD", "description": "A token representing the stake.", "attributes:" ["poolId": _poolId, "tokenAmount": _tokenAmount]}'
                             )
                         )
                     )

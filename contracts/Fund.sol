@@ -66,6 +66,11 @@ contract Fund is Ownable, ReentrancyGuard {
   mapping (uint256 => Stake[]) initStakes; // poolId => Stake[]
   mapping (address => CanVote[]) canVote;
 
+  uint256 totalInitStakes = 0;
+
+  mapping (uint256 => uint256) stakersInThePool;
+  mapping (uint256 => uint256) stakedInThePool;
+
   Voting[] votings;
   Vote[] votes;
    
@@ -111,6 +116,7 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function _addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
+    totalInitStakes++;
     token.transferFrom(msg.sender, address(this), _tokenamount);
     emit StakedInit(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
@@ -145,19 +151,21 @@ contract Fund is Ownable, ReentrancyGuard {
     
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
     uint256 tokenId = x721.mintNFT(msg.sender, _poolId, _tokenamount);
-    busdStakes.push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
+    busdStakes.push(BUSDStake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
+    stakersInThePool[_poolId]++;
+    stakedInThePool[_poolId] += _tokenamount; 
     emit Staked(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
   }
 
-  function withdrawBUSDWithToken(uint256 _tokenId, uint256 _poolId, uint256 _idInPool) public nonReentrant {
+  function withdrawBUSDWithToken(uint256 _tokenId, uint256 _poolId, uint256 _idInHeap) public nonReentrant {
     require(pools[_poolId].funded >= 0);
     require(x721.ownerOf(_tokenId) == msg.sender);
 
-    uint256 unclaimedReward = busdStakes[_idInPool].rewards - busdStakes[_idInPool].claimedRewards;
-    busdStakes[_idInPool].claimedRewards += unclaimedReward;
+    uint256 unclaimedReward = busdStakes[_idInHeap].rewards - busdStakes[_idInHeap].claimedRewards;
+    busdStakes[_idInHeap].claimedRewards += unclaimedReward;
 
-    busd.transferFrom(address(this), busdStakes[i].from, unclaimedReward);
+    busd.transferFrom(address(this), busdStakes[_idInHeap].from, unclaimedReward);
 
     emit RevenueWithdrawn(_poolId, block.timestamp, msg.sender, _tokenId);
   }
@@ -194,7 +202,7 @@ contract Fund is Ownable, ReentrancyGuard {
       if (pools[i].funded == 0) {
         continue;
       }
-      uint256 totalStakedInCurrentPool = totalStakedInPool(pools[i].number);
+      uint256 totalStakedInCurrentPool = stakedInThePool[pools[i].number];
       for (uint256 j = from; j < to; j++) {
         if (busdStakes[j].poolId == pools[i].number && pools[i].funded > 0) {
           uint256 part = busdStakes[j].tokenamount * 10e8 / totalStakedInCurrentPool;
@@ -208,8 +216,6 @@ contract Fund is Ownable, ReentrancyGuard {
   /// Call only when the pool is funded
   function emergencyWithdrawRewardsToAll(uint256 _poolId, uint256 _busdStakesAmount) public onlyOwner {
     require(pools[_poolId].funded >= 0);
-
-    Stake storage stake = busdStakes[0];
 
     for (uint256 i = 0; i < _busdStakesAmount; i++) {
       if (busdStakes[i].poolId == _poolId) {
@@ -225,8 +231,6 @@ contract Fund is Ownable, ReentrancyGuard {
   /// Call only when the pool is funded
   function emergencyWithdrawRewardsToAdmin(uint256 _poolId, uint256 _busdStakesAmount) public onlyOwner {
     require(pools[_poolId].funded >= 0);
-
-    Stake storage stake = busdStakes[0];
 
     for (uint256 i = 0; i < _busdStakesAmount; i++) {
       if (busdStakes[i].poolId == _poolId) {
@@ -286,11 +290,7 @@ contract Fund is Ownable, ReentrancyGuard {
   }
 
   function getTotalInitStakes() public view returns (uint256) {
-    uint256 result = 0;
-    for (uint256 i = 0; i < pools.length; i++) {
-      result += initStakes[i].length;
-    }
-    return result;
+    return totalInitStakes;
   }
 
   function getTotalBUSDStakes() public view returns (uint256) {
@@ -326,32 +326,20 @@ contract Fund is Ownable, ReentrancyGuard {
 
   /// Returns pool id or -1
   function isTokenInPool(uint256 _poolId, uint256 _tokenId) public view returns(int256) {
-    for (uint256 i = 0; i < busdStakes[_poolId].length; i++) {
-      if (busdStakes[_poolId][i].tokenId == _tokenId) {
+    for (uint256 i = 0; i < busdStakes.length; i++) {
+      if (busdStakes[i].tokenId == _tokenId) {
         return int(i);
       }
     }
     return -1;
   }
 
-  function totalStakedInPool(uint256 _poolId) public view returns (uint256) {
-    uint256 totalStaked = 0;
-    for (uint256 i = 0; i < busdStakes.length; i++) {
-      if (busdStakes[i].poolId == _poolId) {
-        totalStaked += busdStakes[i].tokenamount; 
-      }
-    }
-    return totalStaked;
+  function getTotalStakedInPool(uint256 _poolId) public view returns (uint256) {
+    return stakedInThePool[_poolId];
   }
 
-  function stakersInThePool(uint256 _poolId) public view returns (uint256) {
-    uint256 totalStakers = 0;
-    for (uint256 i = 0; i < busdStakes.length; i++) {
-      if (busdStakes[i].poolId == _poolId) {
-        totalStakers++;
-      }
-    }
-    return totalStakers;
+  function getStakersInThePool(uint256 _poolId) public view returns (uint256) {
+    return stakersInThePool[_poolId];
   }
 
   /* ========== UTILITY METHODS ========== */
