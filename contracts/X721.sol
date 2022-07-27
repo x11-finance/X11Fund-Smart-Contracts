@@ -9,9 +9,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/Base64.sol";
 
 
-contract X721 is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable, ERC721Burnable, AccessControl {
+contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, Ownable, AccessControl { // /* ERC721Burnable, ERC721URIStorage */
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
@@ -72,8 +73,9 @@ contract X721 is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable, 
         uint256 newItemId = _tokenIdCounter.current();
         tokensData[newItemId] = Metadata2(poolId, amount);
 
-        _setTokenURI(newItemId, formatTokenUri(poolId, amount));
         _mint(client, newItemId);
+        _setTokenURI(newItemId, formatTokenURI(poolId, amount));
+
         emit Minted(client, poolId, amount, newItemId);
         
         return newItemId;
@@ -94,6 +96,13 @@ contract X721 is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable, 
                     )
                 )
             );
+    }
+
+    function tokenURI(uint256 tokenId) public view virtual override(ERC721, ERC721URIStorage) returns (string memory) {
+        
+    }
+    
+    function _burn(uint256 tokenId) internal virtual override(ERC721, ERC721URIStorage) {
     }
 
     function peggedAmount(uint256 _tokenId) public view returns (uint256) {

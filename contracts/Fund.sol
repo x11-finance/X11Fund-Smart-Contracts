@@ -20,6 +20,8 @@ contract Fund is Ownable, ReentrancyGuard {
     uint256 claimedRewards;
   }
 
+  mapping (address => mapping(uint256 => bool)) staker;
+
   struct BUSDStake {
     address from;
     uint256 tokenamount;
@@ -38,6 +40,8 @@ contract Fund is Ownable, ReentrancyGuard {
     string companies;
     uint256 funded;
     bool isActive;
+    string setStarts;
+    string setEnds;
   }
 
   struct Vote {
@@ -77,6 +81,11 @@ contract Fund is Ownable, ReentrancyGuard {
   Pool[] public pools;
   BUSDStake[] busdStakes; 
 
+  uint256 totalInvestments;
+
+  address adminWallet;
+  address fundFeeWallet;
+
   /* ========== EVENTS ========== */
 
   event Staked(address indexed user, uint256 amount, uint256 poolIndex, uint256 indexInPool, uint256 timestamp);
@@ -94,17 +103,25 @@ contract Fund is Ownable, ReentrancyGuard {
     token = IERC20(_token);
     busd = IERC20(_busd);
     x721 = X721(_x721);
+    adminWallet = 0xCA04E3fF4bfC69C02f6DAe8B21Ff2C045312941A;
+    fundFeeWallet = 0xCA04E3fF4bfC69C02f6DAe8B21Ff2C045312941A;
   }
 
   /// Adds a Pool to the Fund
   /// ids and names of the companies should be of the same length
-  function addPool(uint _number, string memory _name, string memory _description, string memory _companies) public onlyOwner {
+  function addPool(uint _number, string memory _name, string memory _description, string memory _companies, string memory _setStarts, string memory _setEnds) public onlyOwner {
     uint createdAt = block.timestamp;
-    pools.push(Pool(_number, _name, createdAt, _description, _companies, 0, true));
+    pools.push(Pool(_number, _name, createdAt, _description, _companies, 0, true, _setStarts, _setEnds));
   }
 
   /// Returns Pool Info
   function getPoolInfo(uint _i) public view returns (Pool memory) {
+    require(staker[msg.sender][_i] == true, "You're not a member of this pool.");
+    return pools[_i];
+  }
+
+  /// Returns Pool Info
+  function getPoolInfoAdmin(uint _i) public view onlyOwner returns (Pool memory) {
     return pools[_i];
   }
 
@@ -117,6 +134,7 @@ contract Fund is Ownable, ReentrancyGuard {
   function _addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
     totalInitStakes++;
+    staker[msg.sender][_poolId] = true;
     token.transferFrom(msg.sender, address(this), _tokenamount);
     emit StakedInit(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
@@ -148,17 +166,21 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function _addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     busd.transferFrom(msg.sender, address(this), _tokenamount);
-    
+    uint256 fee = _tokenamount * 20 / 100;
+    uint256 tokenamount = _tokenamount - fee;
+    busd.transferFrom(address(this), fundFeeWallet, fee);
+    busd.transferFrom(address(this), fundFeeWallet, tokenamount);
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
-    uint256 tokenId = x721.mintNFT(msg.sender, _poolId, _tokenamount);
-    busdStakes.push(BUSDStake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
+    uint256 tokenId = x721.mintNFT(msg.sender, _poolId, tokenamount);
+    busdStakes.push(BUSDStake(msg.sender, tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
     stakersInThePool[_poolId]++;
-    stakedInThePool[_poolId] += _tokenamount; 
-    emit Staked(msg.sender, _tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
+    stakedInThePool[_poolId] += tokenamount;
+    totalInvestments += tokenamount; 
+    emit Staked(msg.sender, tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
     return true;
   }
 
-  function withdrawBUSDWithToken(uint256 _tokenId, uint256 _poolId, uint256 _idInHeap) public nonReentrant {
+  function withdrawBUSDRewardWithToken(uint256 _tokenId, uint256 _poolId, uint256 _idInHeap) public nonReentrant {
     require(pools[_poolId].funded >= 0);
     require(x721.ownerOf(_tokenId) == msg.sender);
 
@@ -196,14 +218,28 @@ contract Fund is Ownable, ReentrancyGuard {
 
   /* ========== ADMIN METHODS ========== */
 
+  function setAdminWallet(address _wallet) public onlyOwner {
+    adminWallet = _wallet;
+  }
+
+  function setFeeWallet(address _wallet) public onlyOwner {
+    fundFeeWallet = _wallet;
+  }
+
   /// Call only when the contract is funded
-  function updateRewards(uint256 _poolsAmount, uint256 from, uint256 to) public onlyOwner {
+  function updateRewards(uint256 _poolsAmount, uint256 _from, uint256 _to) public {
+    uint256 to;
     for (uint256 i = 0; i < _poolsAmount; i++) {
       if (pools[i].funded == 0) {
         continue;
       }
       uint256 totalStakedInCurrentPool = stakedInThePool[pools[i].number];
-      for (uint256 j = from; j < to; j++) {
+      if (_to > busdStakes.length) {
+        to = busdStakes.length;
+      } else {
+        to = _to;
+      }
+      for (uint256 j = _from; j < to; j++) {
         if (busdStakes[j].poolId == pools[i].number && pools[i].funded > 0) {
           uint256 part = busdStakes[j].tokenamount * 10e8 / totalStakedInCurrentPool;
           busdStakes[j].rewards = pools[i].funded * part / 10e8;
@@ -340,6 +376,10 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function getStakersInThePool(uint256 _poolId) public view returns (uint256) {
     return stakersInThePool[_poolId];
+  }
+
+  function getTotalInvestment() public view returns (uint256) {
+    return totalInvestments;
   }
 
   /* ========== UTILITY METHODS ========== */

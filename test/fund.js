@@ -34,9 +34,12 @@ contract("Fund", function (accounts) {
       0,
       "Pool#1",
       "Pool number one",
-      "Some companies"
+      "Some companies",
+      "13.07.2022",
+      "30.07.2022"
     );
-    let pool = await this.instance.getPoolInfo(0);
+    let pool = await this.instance.getPoolInfoAdmin(0);
+    console.log(pool);
     return assert.equal(pool.name, "Pool#1");
   });
 
@@ -94,7 +97,8 @@ contract("Fund", function (accounts) {
 
   it("should allow members to vote", async function () {
     await this.instance.startVoting(0, { from: accounts[0] });
-    await this.instance.castVote(0, true, { from: accounts[0] });
+
+    await this.instance.castVote(0, true, 1, { from: accounts[0] });
 
     let votes = await this.instance.getVotes(0);
 
@@ -132,7 +136,9 @@ contract("Fund", function (accounts) {
     let balanceBefore = await this.busd.balanceOf(accounts[0]);
     let poolsAmount = await this.instance.getTotalPools();
     let busdStakesAmount = await this.instance.getTotalBUSDStakes();
-    await this.instance.updateRewards(poolsAmount, busdStakesAmount);
+    await this.instance.updateRewards(poolsAmount, 0, 50, {
+      from: accounts[0],
+    });
     await this.instance.ApproveBUSD(
       web3.utils.toWei("1000000000000000.0", "ether")
     );
