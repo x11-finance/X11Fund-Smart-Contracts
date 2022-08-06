@@ -35,11 +35,23 @@ contract("Fund", function (accounts) {
       "Pool#1",
       "Pool number one",
       "Some companies",
-      "13.07.2022",
-      "30.07.2022"
+      "2022-07-13",
+      "2022-07-30"
     );
     let pool = await this.instance.getPoolInfoAdmin(0);
-    console.log(pool);
+
+    await this.instance.addPool(
+      1,
+      "Pool#2",
+      "Pool number two",
+      "Companies again",
+      "2022-07-30",
+      "2022-08-30"
+    );
+
+    let totalPools = await this.instance.getTotalPools();
+    console.log("Total pools: ", totalPools.toNumber());
+
     return assert.equal(pool.name, "Pool#1");
   });
 
@@ -72,9 +84,12 @@ contract("Fund", function (accounts) {
     let balance = await this.busd.balanceOf(accounts[0]);
     //console.log(balance.toString());
 
+    this.instance.setAdminWallet(accounts[1]);
+    this.instance.setFeeWallet(accounts[2]);
+
     await this.busd.approve(
       this.instance.address,
-      web3.utils.toWei("10000.0", "ether"),
+      web3.utils.toWei("5000.0", "ether"),
       { from: accounts[0] }
     );
     let allowance = await this.instance.GetBUSDAllowance();
@@ -87,11 +102,17 @@ contract("Fund", function (accounts) {
 
     balance = await this.instance.GetUserBUSDBalance({ from: accounts[0] });
     let balanceOfInstance = await this.busd.balanceOf(this.instance.address);
-    //console.log(balance.toString());
 
-    let canvote = await this.instance.getTotalBUSDStakes();
-    //console.log("Stakes: ", canvote.toString());
+    balanceAdmin = await this.instance.GetUserBUSDBalance({
+      from: accounts[1],
+    });
 
+    balanceFee = await this.instance.GetUserBUSDBalance({
+      from: accounts[2],
+    });
+
+    assert.equal(balanceAdmin, "4900000000000000000000");
+    assert.equal(balanceFee, "100000000000000000000");
     return assert.equal(balance.toString(), "9999995000000000000000000000");
   });
 

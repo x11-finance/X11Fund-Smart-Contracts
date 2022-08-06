@@ -23,6 +23,7 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
         uint256 amount;
     }
     mapping(uint256 => Metadata2) tokensData; // id => data
+    uint256[] tokens;
 
     /* ========== EVENTS ========== */
 
@@ -72,6 +73,7 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
         _tokenIdCounter.increment();
         uint256 newItemId = _tokenIdCounter.current();
         tokensData[newItemId] = Metadata2(poolId, amount);
+        tokens.push(newItemId);
 
         _mint(client, newItemId);
         _setTokenURI(newItemId, formatTokenURI(poolId, amount));
@@ -99,7 +101,9 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
     }
 
     function tokenURI(uint256 tokenId) public view virtual override(ERC721, ERC721URIStorage) returns (string memory) {
-        
+        uint256 poolId = tokensData[tokenId].poolId;
+        uint256 amount = tokensData[tokenId].amount;
+        return formatTokenURI(poolId, amount);
     }
     
     function _burn(uint256 tokenId) internal virtual override(ERC721, ERC721URIStorage) {
@@ -111,5 +115,15 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
 
     function getPoolId(uint256 _tokenId) public view returns (uint256) {
         return tokensData[_tokenId].poolId;
+    }
+
+    function getBalanceInPool(uint256 _poolId) public view returns (uint256) {
+        uint256 balanceInPool = 0;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (ownerOf(tokens[i]) == msg.sender && tokensData[tokens[i]].poolId == _poolId) {
+                balanceInPool += tokensData[tokens[i]].amount;
+            }
+        }
+        return balanceInPool;
     }
 }

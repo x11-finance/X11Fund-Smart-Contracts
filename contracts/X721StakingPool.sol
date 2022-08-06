@@ -167,6 +167,9 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         require(unclaimedReward > 0 , "0 rewards yet");
 
         stakes[_user].claimedRewards += unclaimedReward;
+        
+        rewardToken.approve(address(this), unclaimedReward);
+        rewardToken.approve(_user, unclaimedReward);
         rewardToken.transferFrom(address(this), msg.sender, unclaimedReward);
 
         emit RewardPaid(_user, unclaimedReward);

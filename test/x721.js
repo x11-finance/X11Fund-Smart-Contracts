@@ -60,7 +60,10 @@ contract("X721", function (accounts) {
     const balance = await this.token.balanceOf(accounts[0]);
     const owner = await this.token.ownerOf(tokenId);
 
+    const balanceXUSD = await this.token.getBalanceInPool(0);
+
     assert.equal(balance.toNumber(), 2);
+    assert.equal(balanceXUSD, 20000);
     return assert.equal(owner, accounts[0]);
   });
 });
