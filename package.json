@@ -7,7 +7,8 @@
   },
   "devDependencies": {
     "@openzeppelin/truffle-upgrades": "^1.15.0",
-    "truffle": "^5.5.14"
+    "truffle": "^5.5.14",
+    "truffle-plugin-verify": "^0.5.27"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.6.0",

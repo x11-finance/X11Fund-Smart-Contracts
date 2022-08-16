@@ -1,5 +1,7 @@
 const X11 = artifacts.require("X11");
 
+const truffleAssert = require("truffle-assertions");
+
 /*
  * uncomment accounts to access the test accounts made available by the
  * Ethereum client
@@ -28,6 +30,69 @@ contract("X11", function (accounts) {
     const decimals = await this.token.decimals();
     return assert.equal(decimals.toNumber(), _decimals);
   });
+
+  it("has the correct total supply", async function () {
+    const totalSupply = await this.token.totalSupply();
+    return assert.equal(
+      totalSupply.toString(),
+      "10000000000000000000000000000"
+    );
+  });
+
+  it("has the correct balance of the owner", async function () {
+    const balance = await this.token.balanceOf(accounts[0]);
+    return assert.equal(balance.toString(), "10000000000000000000000000000");
+  });
+
+  it("has the correct balance of another account", async function () {
+    const balance = await this.token.balanceOf(accounts[1]);
+    return assert.equal(balance.toNumber(), 0);
+  });
+
+  it("should transfer the correct amount of tokens", async function () {
+    await this.token.transfer(accounts[1], web3.utils.toWei("1.0", "ether"), {
+      from: accounts[0],
+    });
+    const balance = await this.token.balanceOf(accounts[1]);
+    return assert.equal(balance.toString(), "1000000000000000000");
+  });
+
+  /* it("should not mint tokens", async function () {
+    await truffleAssert.fails(this.token.mint(accounts[0], 1));
+  });
+
+  it("should not burn tokens", async function () {
+    // await truffleAssert.reverts(this.token.burn(1));
+  }); */
+
+  it("should not transfer tokens without approval", async function () {
+    // await this.token.transferFrom(accounts[1], 1, { from: accounts[0] });
+    const approval = await this.token.allowance(accounts[0], accounts[1]);
+    console.log("Approval: ", approval.toString());
+    await truffleAssert.reverts(
+      this.token.transferFrom(accounts[1], accounts[0], 1)
+    );
+  });
+
+  it("should approve tokens even if the balance is zero", async function () {
+    const balance = await this.token.balanceOf(accounts[2]);
+    const approval = await this.token.allowance(accounts[0], accounts[2]);
+
+    await this.token.approve(accounts[2], 1);
+    const approval2 = await this.token.allowance(accounts[0], accounts[2]);
+
+    assert.equal(balance.toString(), "0");
+    assert.equal(approval.toString(), "0");
+    return assert.equal(approval2.toString(), "1");
+  });
+
+  it("should not transfer from tokens without approval", async function () {
+    await truffleAssert.reverts(
+      this.token.transferFrom(accounts[0], accounts[1], 1)
+    );
+  });
+
+  it("should not transfer from approved tokens", async function () {});
 
   it("should return the balance of token owner", async function () {
     const balance = await this.token.balanceOf.call(accounts[0]);

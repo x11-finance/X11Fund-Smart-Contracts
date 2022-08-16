@@ -5,6 +5,8 @@ const X11 = artifacts.require("X11");
 const BUSD = artifacts.require("BUSD");
 const XUSD = artifacts.require("X721");
 
+const truffleAssert = require("truffle-assertions");
+
 /*
  * uncomment accounts to access the test accounts made available by the
  * Ethereum client
@@ -27,6 +29,20 @@ contract("ERC721Staking", function (accounts) {
       this.fund.address,
       { from: accounts[0] }
     );
+
+    await this.token.approve(
+      accounts[0],
+      web3.utils.toWei("1000000.0", "ether"),
+      {
+        from: accounts[0],
+      }
+    );
+    await this.token.transferFrom(
+      accounts[0],
+      this.pool.address,
+      web3.utils.toWei("1000000.0", "ether"),
+      { from: accounts[0] }
+    );
   });
 
   it("should deploy", async function () {
@@ -41,9 +57,58 @@ contract("ERC721Staking", function (accounts) {
     return assert.equal(rate.toString(), "10000000000000000000");
   });
 
-  it("should distribute rewards", async function () {
+  it("shouldn't accept the stake before staking is started", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await truffleAssert.reverts(
+      this.pool.stake(tokenId, {
+        from: accounts[0],
+      }),
+      "The staking has not started."
+    );
+  });
+
+  it("should accept the stake", async function () {
     await this.pool.initStaking({ from: accounts[0] });
-    await this.pool.setTokensClaimable(true);
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    truffleAssert.passes(
+      this.pool.stake(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should not accept the stake without approval", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    truffleAssert.fails(
+      this.pool.stake(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should not allow non-owner to withdraw stake", async function () {
+    this.pool.setTokensClaimable(true, { from: accounts[0] });
+    truffleAssert.fails(this.pool.unstake(1, { from: accounts[1] }));
+  });
+
+  it("should distribute rewards", async function () {
+    await this.pool.setTokensClaimable(true, { from: accounts[0] });
 
     let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
       from: accounts[0],
@@ -51,18 +116,15 @@ contract("ERC721Staking", function (accounts) {
     const { logs } = tx;
     const tokenId = logs[1].args.tokenId;
 
-    console.log("Token ID: ", tokenId);
-
     await this.xUSD.approve(this.pool.address, tokenId);
     await this.pool.stake(tokenId);
 
     let tokens = await this.pool.getStakedTokens(accounts[0]);
-    assert.equal(tokens[0].toString(), "1");
+    assert.equal(tokens[0].toString(), "2");
 
     await this.pool.updateReward(accounts[0]);
     let reward = await this.pool.claimReward.call(accounts[0]);
-    console.log("REWARD: ", reward.toString());
 
-    return assert.isTrue(true);
+    return assert.equal("5265753372000000000", reward.toString());
   });
 });

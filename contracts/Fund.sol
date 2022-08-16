@@ -173,7 +173,7 @@ contract Fund is Ownable, ReentrancyGuard {
     busd.transferFrom(address(this), fundFeeWallet, fee);
     busd.transferFrom(address(this), adminWallet, tokenamount);
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
-    uint256 tokenId = x721.mintNFT(msg.sender, _poolId, tokenamount);
+    uint256 tokenId = x721.mintNFT(msg.sender, _poolId, _tokenamount);
     busdStakes.push(BUSDStake(msg.sender, tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
     stakersInThePool[_poolId]++;
     stakedInThePool[_poolId] += tokenamount;

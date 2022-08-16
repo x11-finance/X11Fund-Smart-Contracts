@@ -32,6 +32,52 @@ contract("X721", function (accounts) {
     );
   });
 
+  it("is not possible to mint tokens for non-minter role", async function () {
+    await truffleAssert.fails(
+      this.token.mintNFT(deployerAddress, 0, 10000, { from: accounts[1] })
+    );
+  });
+
+  it("is possible to transfer tokens for the owner role", async function () {
+    const tx = await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+    const tokenId = tx.logs[0].args.tokenId;
+    await truffleAssert.passes(
+      this.token.transferFrom(deployerAddress, tokenHolderOneAddress, tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("is not possible to transfer tokens for non-owner role", async function () {
+    const tx = await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+    const tokenId = tx.logs[0].args.tokenId;
+    await truffleAssert.fails(
+      this.token.transferFrom(deployerAddress, tokenHolderOneAddress, tokenId, {
+        from: accounts[1],
+      })
+    );
+  });
+
+  it("is possible to burn tokens for the owner role", async function () {
+    const tx = await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+    const tokenId = tx.logs[0].args.tokenId;
+    await truffleAssert.passes(this.token.burn(tokenId, { from: accounts[0] }));
+  });
+
+  it("is not possible to burn tokens for non-owner role", async function () {
+    const tx = await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+    const tokenId = tx.logs[0].args.tokenId;
+    await truffleAssert.fails(this.token.burn(tokenId, { from: accounts[1] }));
+  });
+
   it("can trace the token contents", async function () {
     let tx = await this.token.mintNFT(deployerAddress, 1, 50000, {
       from: accounts[0],
@@ -65,5 +111,27 @@ contract("X721", function (accounts) {
     assert.equal(balance.toNumber(), 2);
     assert.equal(balanceXUSD, 20000);
     return assert.equal(owner, accounts[0]);
+  });
+
+  it("can transfer tokens between users", async function () {
+    await this.token.mintNFT(deployerAddress, 0, 20000, {
+      from: accounts[0],
+    });
+    let tx = await this.token.mintNFT(deployerAddress, 1, 30000, {
+      from: accounts[0],
+    });
+
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.token.transferFrom(accounts[0], accounts[1], tokenId, {
+      from: accounts[0],
+    });
+
+    const balance = await this.token.balanceOf(accounts[1]);
+    const owner = await this.token.ownerOf(tokenId);
+
+    assert.equal(balance.toNumber(), 1);
+    return assert.equal(owner, accounts[1]);
   });
 });
