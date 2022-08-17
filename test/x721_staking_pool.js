@@ -5,7 +5,10 @@ const X11 = artifacts.require("X11");
 const BUSD = artifacts.require("BUSD");
 const XUSD = artifacts.require("X721");
 
+const SECONDS_IN_DAY = 86400;
+
 const truffleAssert = require("truffle-assertions");
+const helpers = require("./helpers");
 
 /*
  * uncomment accounts to access the test accounts made available by the
@@ -88,6 +91,152 @@ contract("ERC721Staking", function (accounts) {
     );
   });
 
+  it("shouldn't allow to withdraw stake and rewards until tokens are set claimable", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    await this.pool.stake(tokenId, {
+      from: accounts[0],
+    });
+
+    await truffleAssert.reverts(
+      this.pool.unstake(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should allow to emergency withdraw stake without carrying about the rewards", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    await this.pool.stake(tokenId, {
+      from: accounts[0],
+    });
+
+    await this.pool.setTokensClaimable(true, { from: accounts[0] });
+
+    await truffleAssert.passes(
+      this.pool.emergencyUnstake(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should not allow to emergency unstake twice", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    await this.pool.stake(tokenId, {
+      from: accounts[0],
+    });
+
+    await this.pool.setTokensClaimable(true, { from: accounts[0] });
+
+    await this.pool.emergencyUnstake(tokenId, {
+      from: accounts[0],
+    });
+
+    await truffleAssert.reverts(
+      this.pool.emergencyUnstake(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should allow to withdraw stake and rewards after tokens are set claimable", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    await this.pool.stake(tokenId, {
+      from: accounts[0],
+    });
+
+    await this.pool.setTokensClaimable(true, { from: accounts[0] });
+    await this.pool.updateReward(accounts[0]);
+
+    await truffleAssert.passes(
+      this.pool.unstake(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("shouldn't allow to withdraw stake twice", async function () {
+    const snapshot = await helpers.takeSnapshot();
+    const snapshotId = snapshot["result"];
+
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    await this.pool.stake(tokenId, {
+      from: accounts[0],
+    });
+
+    await helpers.advanceTimeAndBlock(SECONDS_IN_DAY * 30);
+
+    await this.pool.setTokensClaimable(true, { from: accounts[0] });
+    await this.pool.updateReward(accounts[0]);
+
+    await this.pool.unstake(tokenId, {
+      from: accounts[0],
+    });
+
+    await truffleAssert.reverts(
+      this.pool.unstake(tokenId, {
+        from: accounts[0],
+      })
+    );
+
+    await helpers.revertToSnapShot(snapshotId);
+  });
+
+  it("should allow one person to stake more than once", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId);
+    await this.pool.stake(tokenId, {
+      from: accounts[0],
+    });
+
+    let tx2 = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs: logs2 } = tx2;
+    const tokenId2 = logs2[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId2);
+    await truffleAssert.passes(
+      this.pool.stake(tokenId2, {
+        from: accounts[0],
+      })
+    );
+  });
+
   it("should not accept the stake without approval", async function () {
     let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
       from: accounts[0],
@@ -108,6 +257,9 @@ contract("ERC721Staking", function (accounts) {
   });
 
   it("should distribute rewards", async function () {
+    const snapShot = await helpers.takeSnapshot();
+    const snapshotId = snapShot["result"];
+
     await this.pool.setTokensClaimable(true, { from: accounts[0] });
 
     let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
@@ -119,11 +271,15 @@ contract("ERC721Staking", function (accounts) {
     await this.xUSD.approve(this.pool.address, tokenId);
     await this.pool.stake(tokenId);
 
+    await helpers.advanceTimeAndBlock(SECONDS_IN_DAY * 30);
+
     let tokens = await this.pool.getStakedTokens(accounts[0]);
     assert.equal(tokens[0].toString(), "2");
 
     await this.pool.updateReward(accounts[0]);
     let reward = await this.pool.claimReward.call(accounts[0]);
+
+    await helpers.revertToSnapShot(snapshotId);
 
     return assert.equal("5266027344600000000", reward.toString());
   });
