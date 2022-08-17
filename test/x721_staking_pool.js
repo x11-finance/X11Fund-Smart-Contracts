@@ -125,6 +125,6 @@ contract("ERC721Staking", function (accounts) {
     await this.pool.updateReward(accounts[0]);
     let reward = await this.pool.claimReward.call(accounts[0]);
 
-    return assert.equal("5265753372000000000", reward.toString());
+    return assert.equal("5266027344600000000", reward.toString());
   });
 });

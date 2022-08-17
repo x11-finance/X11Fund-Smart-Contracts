@@ -109,7 +109,7 @@ contract Fund is Ownable, ReentrancyGuard {
 
   /// Adds a Pool to the Fund
   /// ids and names of the companies should be of the same length
-  function addPool(uint _number, string memory _name, string memory _description, string memory _companies, string memory _setStarts, string memory _setEnds) public { //onlyOwner {
+  function addPool(uint _number, string memory _name, string memory _description, string memory _companies, string memory _setStarts, string memory _setEnds) public onlyOwner {
     uint createdAt = block.timestamp;
     pools.push(Pool(_number, _name, createdAt, _description, _companies, 0, true, _setStarts, _setEnds));
   }
@@ -127,6 +127,7 @@ contract Fund is Ownable, ReentrancyGuard {
   function addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
     require(_tokenamount <= GetAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 6000000000000000000000, "6000 is necessary to open the pool.");
+    require(staker[msg.sender][_poolId] == false, "You've already staked in this pool.");
     return _addStakeHolderInPool(_poolId, _tokenamount);
   }
 
@@ -150,7 +151,7 @@ contract Fund is Ownable, ReentrancyGuard {
 
   function _claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) internal returns(bool) {
     initStakes[_poolId][uint256(_idInPool)].claimedRewards = initStakes[_poolId][uint256(_idInPool)].tokenamount;
-    token.transferFrom(address(this), initStakes[_poolId][uint256(_idInPool)].from, initStakes[_poolId][uint256(_idInPool)].tokenamount);
+    token.transfer(initStakes[_poolId][uint256(_idInPool)].from, initStakes[_poolId][uint256(_idInPool)].tokenamount);
     emit UnstakedInit(msg.sender, initStakes[_poolId][uint256(_idInPool)].tokenamount, _poolId, block.timestamp);
     return true;
   }
@@ -189,7 +190,7 @@ contract Fund is Ownable, ReentrancyGuard {
     uint256 unclaimedReward = busdStakes[_idInHeap].rewards - busdStakes[_idInHeap].claimedRewards;
     busdStakes[_idInHeap].claimedRewards += unclaimedReward;
 
-    busd.transferFrom(address(this), busdStakes[_idInHeap].from, unclaimedReward);
+    busd.transfer(busdStakes[_idInHeap].from, unclaimedReward);
 
     emit RevenueWithdrawn(_poolId, block.timestamp, msg.sender, _tokenId);
   }

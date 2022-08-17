@@ -66,9 +66,8 @@ contract("X11", function (accounts) {
   }); */
 
   it("should not transfer tokens without approval", async function () {
-    // await this.token.transferFrom(accounts[1], 1, { from: accounts[0] });
     const approval = await this.token.allowance(accounts[0], accounts[1]);
-    console.log("Approval: ", approval.toString());
+
     await truffleAssert.reverts(
       this.token.transferFrom(accounts[1], accounts[0], 1)
     );
