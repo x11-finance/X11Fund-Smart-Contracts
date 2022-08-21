@@ -31,23 +31,34 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
 
     /* ========== METHODS ========== */
 
+    /**
+     * @dev Initialises the contract
+     */
     constructor() ERC721("xUSD", "xUSD") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
     }
 
+    /**
+     * @dev Puts minting on pause
+     */
     function pause() public onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev Unpauses minting
+     */
     function unpause() public onlyOwner {
         _unpause();
     }
 
+    // SHOULD NOT BE USED
     function safeMint(address to) public onlyOwner {
         require(1 == 10, "Doesn't work with this token.");
     }
 
+    // The following function is override required by Solidity.
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
         internal
         whenNotPaused
@@ -56,8 +67,7 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
-    // The following functions are overrides required by Solidity.
-
+    // The following function is override required by Solidity.
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -67,22 +77,33 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
         return super.supportsInterface(interfaceId);
     }
 
-    function mintNFT(address client, uint256 poolId, uint256 amount) public returns (uint256) {
+    /**
+     * @dev Mints a new token
+     * @param _client The address of the token owner
+     * @param _poolId The id of the pool
+     * @param _amount The amount of the token
+     */
+    function mintNFT(address _client, uint256 _poolId, uint256 _amount) public returns (uint256) {
         require(hasRole(MINTER_ROLE, msg.sender), "Caller is not a minter");
         
         _tokenIdCounter.increment();
         uint256 newItemId = _tokenIdCounter.current();
-        tokensData[newItemId] = Metadata2(poolId, amount);
+        tokensData[newItemId] = Metadata2(_poolId, _amount);
         tokens.push(newItemId);
 
-        _mint(client, newItemId);
-        _setTokenURI(newItemId, formatTokenURI(poolId, amount));
+        _mint(_client, newItemId);
+        _setTokenURI(newItemId, formatTokenURI(_poolId, _amount));
 
-        emit Minted(client, poolId, amount, newItemId);
+        emit Minted(_client, _poolId, _amount, newItemId);
         
         return newItemId;
     }
 
+    /**
+     * @dev Formats the token URI
+     * @param _poolId The id of the pool
+     * @param _tokenAmount The amount of the token
+     */
     function formatTokenURI(uint256 _poolId, uint256 _tokenAmount) public pure returns (string memory)
     {
         return
@@ -100,23 +121,51 @@ contract X721 is ERC721Enumerable, ERC721Burnable, ERC721URIStorage, Pausable, O
             );
     }
 
-    function tokenURI(uint256 tokenId) public view virtual override(ERC721, ERC721URIStorage) returns (string memory) {
-        uint256 poolId = tokensData[tokenId].poolId;
-        uint256 amount = tokensData[tokenId].amount;
+    /**
+     * @dev Formats the token URI
+     * @param _poolId The id of the pool
+     * @param _amount The amount of the token
+     */
+    function formatTokenURI2(uint256 _poolId, uint256 _amount) public pure returns (string memory) {
+        string memory json = Base64.encode(bytes(string(abi.encodePacked('{"name": "xUSD #', _poolId, '", "description": "xUSD is a tokenized stablecoin that represents the value of USD. It is backed by a basket of stablecoins and can be redeemed for USD at any time.", "image": "https://xusd.finance/images/xUSD.png", "attributes": [{"trait_type": "Pool ID", "value": "', _poolId, '"}, {"trait_type": "Amount", "value": "', _amount, '"}] }'))));
+        string memory output = string(abi.encodePacked('data:application/json;base64,', json));
+        return output;
+    }
+
+    /**
+     * @dev Returns the token URI
+     * @param _tokenId The id of the token
+     */
+    function tokenURI(uint256 _tokenId) public view virtual override(ERC721, ERC721URIStorage) returns (string memory) {
+        uint256 poolId = tokensData[_tokenId].poolId;
+        uint256 amount = tokensData[_tokenId].amount;
         return formatTokenURI(poolId, amount);
     }
     
+    // tokens are not burnable in this contract
     function _burn(uint256 tokenId) internal virtual override(ERC721, ERC721URIStorage) {
     }
 
+    /**
+     * @dev Returns the amount of investments for a given token 
+     * @param _tokenId The id of the token
+     */
     function peggedAmount(uint256 _tokenId) public view returns (uint256) {
         return tokensData[_tokenId].amount;
     }
 
+    /**
+     * @dev Returns the pool id for a given token 
+     * @param _tokenId The id of the token
+     */
     function getPoolId(uint256 _tokenId) public view returns (uint256) {
         return tokensData[_tokenId].poolId;
     }
 
+    /**
+     * @dev Returns user balance in the pool
+     * @param _poolId The id of the pool
+     */
     function getBalanceInPool(uint256 _poolId) public view returns (uint256) {
         uint256 balanceInPool = 0;
         for (uint256 i = 0; i < tokens.length; i++) {

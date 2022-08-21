@@ -53,11 +53,11 @@ contract("ERC721Staking", function (accounts) {
   });
 
   it("should set the correct rate", async function () {
-    await this.pool.setRateToUSD(web3.utils.toWei("10.0", "ether"), {
+    await this.pool.setRateToUSD(web3.utils.toWei("1.0", "ether"), {
       from: accounts[0],
     });
     let rate = await this.pool.x11RateToUSD();
-    return assert.equal(rate.toString(), "10000000000000000000");
+    return assert.equal(rate.toString(), "1000000000000000000");
   });
 
   it("shouldn't accept the stake before staking is started", async function () {
@@ -157,6 +157,9 @@ contract("ERC721Staking", function (accounts) {
   });
 
   it("should allow to withdraw stake and rewards after tokens are set claimable", async function () {
+    const snapShot = await helpers.takeSnapshot();
+    const snapshotId = snapShot["result"];
+
     let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
       from: accounts[0],
     });
@@ -168,6 +171,8 @@ contract("ERC721Staking", function (accounts) {
       from: accounts[0],
     });
 
+    await helpers.advanceTimeAndBlock(SECONDS_IN_DAY * 30);
+
     await this.pool.setTokensClaimable(true, { from: accounts[0] });
     await this.pool.updateReward(accounts[0]);
 
@@ -176,6 +181,8 @@ contract("ERC721Staking", function (accounts) {
         from: accounts[0],
       })
     );
+
+    await helpers.revertToSnapShot(snapshotId);
   });
 
   it("shouldn't allow to withdraw stake twice", async function () {
@@ -262,25 +269,36 @@ contract("ERC721Staking", function (accounts) {
 
     await this.pool.setTokensClaimable(true, { from: accounts[0] });
 
-    let tx = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+    let tx = await this.xUSD.mintNFT(accounts[3], 1, 20000, {
       from: accounts[0],
     });
     const { logs } = tx;
     const tokenId = logs[1].args.tokenId;
 
-    await this.xUSD.approve(this.pool.address, tokenId);
-    await this.pool.stake(tokenId);
+    await this.xUSD.approve(this.pool.address, tokenId, { from: accounts[3] });
+    await this.pool.stake(tokenId, { from: accounts[3] });
 
     await helpers.advanceTimeAndBlock(SECONDS_IN_DAY * 30);
 
-    let tokens = await this.pool.getStakedTokens(accounts[0]);
-    assert.equal(tokens[0].toString(), "2");
+    // let tokens = await this.pool.getStakedTokens(accounts[0]);
+    // assert.equal(tokens[0].toString(), "2");
 
-    await this.pool.updateReward(accounts[0]);
-    let reward = await this.pool.claimReward.call(accounts[0]);
+    await this.pool.setRateToUSD(web3.utils.toWei("1.0", "ether"), {
+      from: accounts[0],
+    });
+    await this.pool.updateReward(accounts[3]);
+    let reward = await this.pool.getReward(accounts[3]);
+    const txn = await this.pool.claimReward(accounts[3], {
+      from: accounts[3],
+    });
+    const balance3 = await this.token.balanceOf(accounts[3]);
+    const contractBalance = await this.token.balanceOf(this.pool.address);
 
     await helpers.revertToSnapShot(snapshotId);
 
-    return assert.equal("5266027344600000000", reward.toString());
+    assert.equal(balance3.toString(), reward.toString());
+    return assert.equal("164.38356", web3.utils.fromWei(reward, "ether"));
   });
+
+  //it("should distribute rewards to multiple stakers", async function () {});
 });

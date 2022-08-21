@@ -8,6 +8,8 @@ const SECONDS_IN_DAY = 86400;
 const truffleAssert = require("truffle-assertions");
 const helpers = require("./helpers");
 
+let tokenId;
+
 /*
  * The main test file
  */
@@ -165,6 +167,8 @@ contract("Fund", function (accounts) {
       { from: accounts[0] }
     );
 
+    tokenId = res.logs[0].args.tokenId;
+
     balance = await this.instance.GetUserBUSDBalance({ from: accounts[0] });
     let balanceOfInstance = await this.busd.balanceOf(this.instance.address);
 
@@ -263,7 +267,7 @@ contract("Fund", function (accounts) {
     });
     let funded = await this.busd.balanceOf(this.instance.address);
     let diff = funded - unfunded;
-    return assert.equal(diff, web3.utils.toWei("10000.0", "ether"));
+    return assert.equal(diff, web3.utils.toWei("6000.0", "ether"));
   });
 
   it("shouldn't allow members to vote when the voting is closed", async function () {
@@ -274,20 +278,13 @@ contract("Fund", function (accounts) {
 
   it("should calculate, update and distribute the rewards", async function () {
     let balanceBefore = await this.busd.balanceOf(accounts[0]);
-    let poolsAmount = await this.instance.getTotalPools();
-    let busdStakesAmount = await this.instance.getTotalBUSDStakes();
-    await this.instance.updateRewards(poolsAmount, 0, 50, {
-      from: accounts[0],
-    });
+
+    await this.instance.updateReward(tokenId);
     await this.instance.ApproveBUSD(
       web3.utils.toWei("1000000000000000.0", "ether")
     );
-    let busdAllowance = await this.instance.GetBUSDAllowance();
-    let thisAllowance = await this.busd.allowance(
-      this.instance.address,
-      this.instance.address
-    );
-    /* await this.instance.withdrawRewards(0, busdStakesAmount, {
+
+    await this.instance.withdrawBUSDRewardWithToken(tokenId, {
       from: accounts[0],
     });
     let balanceAfter = await this.busd.balanceOf(accounts[0]);
@@ -295,8 +292,8 @@ contract("Fund", function (accounts) {
 
     return assert.equal(
       diff.toString(),
-      web3.utils.toWei("10000.0", "ether").toString()
-    ); */
+      web3.utils.toWei("6000.0", "ether").toString()
+    );
   });
 
   it("shouldn't allow the user to add a BUSD stake in the amount of less than 1K", async function () {

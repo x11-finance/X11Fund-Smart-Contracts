@@ -5,6 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./X721.sol";
 
+/**
+ * @title Fund
+ * @dev The main Fund contract.
+ */
 contract Fund is Ownable, ReentrancyGuard {
   struct Company{
     string index;
@@ -81,49 +85,83 @@ contract Fund is Ownable, ReentrancyGuard {
   Pool[] public pools;
   BUSDStake[] busdStakes; 
 
+  mapping (uint256 => BUSDStake) tokenToStake; // tokenId => BUSDStake[]
+
   uint256 totalInvestments;
 
   address adminWallet;
+  address fundWallet;
   address fundFeeWallet;
 
   /* ========== EVENTS ========== */
 
-  event Staked(address indexed user, uint256 amount, uint256 poolIndex, uint256 indexInPool, uint256 timestamp);
+  event Staked(address indexed user, uint256 tokenId, uint256 amount, uint256 poolIndex, uint256 indexInPool, uint256 timestamp);
   event StakedInit(address indexed user, uint256 amount, uint256 poolIndex, uint256 indexInPool, uint256 timestamp);
   event Unstaked(address indexed user, uint256 amount, uint256 poolIndex, uint256 timestamp);
   event UnstakedInit(address indexed user, uint256 amount, uint256 poolIndex, uint256 timestamp);
   event EmergencyWithdrawn(uint256 poolIndex, uint256 timestamp);
   event RevenueWithdrawn(uint256 poolIndex, uint256 timestamp, address to, uint256 tokenId);
   event PoolFunded(uint256 poolId, uint256 tokenamount);
+  event PoolCreated(uint256 poolId, string name, string description, string companies, string setStarts, string setEnds);
+  event RewardUpdated(uint256 poolId, uint256 tokenId); 
   event RewardsUpdated();
 
   /* ========== METHODS ========== */
   
+  /**
+   * @dev Initialises the contract
+   * @param _token The address of X11 token
+   * @param _busd The address of BUSD token
+   * @param _x721 The address of X721 token
+   */
   constructor(address _token, address _busd, address _x721) {
     token = IERC20(_token);
     busd = IERC20(_busd);
     x721 = X721(_x721);
     adminWallet = 0xCA04E3fF4bfC69C02f6DAe8B21Ff2C045312941A;
     fundFeeWallet = 0x1D0D90a4EA47dA82D4E9C32Ce942b376a0F4adb7;
+    fundWallet = 0x1D0D90a4EA47dA82D4E9C32Ce942b376a0F4adb7;
   }
 
-  /// Adds a Pool to the Fund
-  /// ids and names of the companies should be of the same length
+  /** 
+   * @dev Adds a Pool to the Fund
+   * @notice ids and names of the companies should be of the same length
+   * @param _number The number of the pool
+   * @param _name The name of the pool
+   * @param _description The description of the pool
+   * @param _companies The companies of the pool
+   * @param _setStarts The start date of the pool
+   * @param _setEnds The end date of the pool
+   */
   function addPool(uint _number, string memory _name, string memory _description, string memory _companies, string memory _setStarts, string memory _setEnds) public onlyOwner {
     uint createdAt = block.timestamp;
     pools.push(Pool(_number, _name, createdAt, _description, _companies, 0, true, _setStarts, _setEnds));
   }
 
-  /// Returns Pool Info
+  /**
+   * @dev Returns the pool info
+   * @param _i The id of the pool
+   * @return The pool info
+   */
   function getPoolInfo(uint _i) public view returns (Pool memory) {
     return pools[_i];
   }
 
-  /// Returns Pool Info
+  /**
+   * @dev Returns the pool info (admin only)
+   * @param _i The id of the pool
+   * @return The pool info
+   */
   function getPoolInfoAdmin(uint _i) public view onlyOwner returns (Pool memory) {
     return pools[_i];
   }
 
+  /**
+   * @dev Adds stakeholder to the pool
+   * @param _poolId The id of the pool
+   * @param _tokenamount The amount of tokens to stake
+   * @return The status of the operation
+   */
   function addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
     require(_tokenamount <= GetAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 6000000000000000000000, "6000 is necessary to open the pool.");
@@ -131,6 +169,12 @@ contract Fund is Ownable, ReentrancyGuard {
     return _addStakeHolderInPool(_poolId, _tokenamount);
   }
 
+  /**
+   * @dev Internal logic of adding stakeholder to the pool 
+   * @param _poolId The id of the pool
+   * @param _tokenamount The amount of tokens to stake
+   * @return The status of the operation
+   */
   function _addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
     initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
     totalInitStakes++;
@@ -140,6 +184,12 @@ contract Fund is Ownable, ReentrancyGuard {
     return true;
   }
 
+  /**
+   * @dev Claims initial stake back
+   * @param _poolId The id of the pool
+   * @param _idInPool The id of the stakeholder in the pool
+   * @return The status of the operation
+   */
   function claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) public returns(bool) {
     require(_idInPool >= 0, "You're not in this pool!");
     require(initStakes[_poolId][uint256(_idInPool)].since + initStakePeriod <= block.timestamp, "You can unstake in 1 month only");
@@ -149,6 +199,12 @@ contract Fund is Ownable, ReentrancyGuard {
     return _claimInitStakeFromPool(_poolId, _idInPool);
   }
 
+  /**
+   * @dev Internal logic of claimimg initial stake back
+   * @param _poolId The id of the pool
+   * @param _idInPool The id of the stakeholder in the pool
+   * @return The status of the operation
+   */
   function _claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) internal returns(bool) {
     initStakes[_poolId][uint256(_idInPool)].claimedRewards = initStakes[_poolId][uint256(_idInPool)].tokenamount;
     token.transfer(initStakes[_poolId][uint256(_idInPool)].from, initStakes[_poolId][uint256(_idInPool)].tokenamount);
@@ -156,7 +212,13 @@ contract Fund is Ownable, ReentrancyGuard {
     return true;
   }
 
-  function addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
+  /**
+   * @dev Adds an investment to the pool
+   * @param _poolId The id of the pool
+   * @param _tokenamount The amount of tokens to stake
+   * @return tokenId the id of the minted token
+   */
+  function addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) public returns(uint256) {
     require(_tokenamount <= GetBUSDAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 1000000000000000000000, "1000 is necessary to open the pool.");
     require(pools[_poolId].isActive, "The pool is killed.");
@@ -164,35 +226,70 @@ contract Fund is Ownable, ReentrancyGuard {
     return _addBUSDStakeInPool(_poolId, _tokenamount);
   }
 
-  function _addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
+  /**
+   * @dev Internal logic of adding an investment to the pool
+   * @param _poolId The id of the pool
+   * @param _tokenamount The amount of tokens to stake
+   * @return tokenId the id of the minted token
+   */
+  function _addBUSDStakeInPool(uint256 _poolId, uint256 _tokenamount) internal returns(uint256) {
     busd.transferFrom(msg.sender, address(this), _tokenamount);
+    
     uint256 fee = _tokenamount * 2 / 100;
     uint256 tokenamount = _tokenamount - fee;
-    busd.approve(address(this), tokenamount + fee);
-    busd.approve(fundFeeWallet, fee);
-    busd.approve(adminWallet, tokenamount);
-    busd.transferFrom(address(this), fundFeeWallet, fee);
-    busd.transferFrom(address(this), adminWallet, tokenamount);
+
+    busd.transfer(fundFeeWallet, fee);
+    busd.transfer(adminWallet, tokenamount);
+
     canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
     uint256 tokenId = x721.mintNFT(msg.sender, _poolId, _tokenamount);
     busdStakes.push(BUSDStake(msg.sender, tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
+    tokenToStake[tokenId] = busdStakes[busdStakes.length - 1];
+
     stakersInThePool[_poolId]++;
     stakedInThePool[_poolId] += tokenamount;
     totalInvestments += tokenamount; 
-    emit Staked(msg.sender, tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
-    return true;
+    
+    emit Staked(msg.sender, tokenId, tokenamount, _poolId, initStakes[_poolId].length - 1, block.timestamp);
+    
+    return tokenId;
   }
 
-  function withdrawBUSDRewardWithToken(uint256 _tokenId, uint256 _poolId, uint256 _idInHeap) public nonReentrant {
-    require(pools[_poolId].funded >= 0);
+  /// Call only when the contract is funded
+  function updateReward(uint256 _tokenId) public {
+    uint256 poolId = x721.getPoolId(_tokenId);
+    uint256 totalStakedInCurrentPool = stakedInThePool[poolId];
+    address stakerAdr = x721.ownerOf(_tokenId);
+    uint256 stakedAmount = x721.peggedAmount(_tokenId); 
+    BUSDStake storage stake = tokenToStake[_tokenId];
+
+    uint256 part = stake.tokenamount * 10e8 / totalStakedInCurrentPool;
+    stake.rewards = pools[poolId].funded * part / 10e8;
+
+    emit RewardUpdated(poolId, _tokenId);
+  }
+
+
+  /**
+   * @dev Claims reward from investment
+   * @param _tokenId The id of the token
+   */
+  function withdrawBUSDRewardWithToken(uint256 _tokenId) public nonReentrant {
+    uint256 poolId = x721.getPoolId(_tokenId);
+    require(pools[poolId].funded >= 0);
     require(x721.ownerOf(_tokenId) == msg.sender);
 
-    uint256 unclaimedReward = busdStakes[_idInHeap].rewards - busdStakes[_idInHeap].claimedRewards;
-    busdStakes[_idInHeap].claimedRewards += unclaimedReward;
+    uint256 totalStakedInCurrentPool = stakedInThePool[poolId];
+    address stakerAdr = x721.ownerOf(_tokenId);
+    uint256 stakedAmount = x721.peggedAmount(_tokenId);
+    BUSDStake storage stake = tokenToStake[_tokenId];
 
-    busd.transfer(busdStakes[_idInHeap].from, unclaimedReward);
+    uint256 unclaimedReward = stake.rewards - stake.claimedRewards;
+    stake.claimedRewards += unclaimedReward;
 
-    emit RevenueWithdrawn(_poolId, block.timestamp, msg.sender, _tokenId);
+    busd.transfer(stake.from, unclaimedReward);
+
+    emit RevenueWithdrawn(poolId, block.timestamp, msg.sender, _tokenId);
   }
 
   function getVotes(uint256 _poolId) public view returns (uint256) {
@@ -229,8 +326,12 @@ contract Fund is Ownable, ReentrancyGuard {
     fundFeeWallet = _wallet;
   }
 
+  function setFundWallet(address _wallet) public onlyOwner {
+    fundWallet = _wallet;
+  }
+
   /// Call only when the contract is funded
-  function updateRewards(uint256 _poolsAmount, uint256 _from, uint256 _to) public {
+  /*function updateRewards(uint256 _poolsAmount, uint256 _from, uint256 _to) public {
     uint256 to;
     for (uint256 i = 0; i < _poolsAmount; i++) {
       if (pools[i].funded == 0) {
@@ -265,7 +366,7 @@ contract Fund is Ownable, ReentrancyGuard {
     }
     pools[_poolId].funded = 0;
     emit EmergencyWithdrawn(_poolId, block.timestamp);
-  }
+  }*/
 
   /// Call only when the pool is funded
   function emergencyWithdrawRewardsToAdmin(uint256 _poolId, uint256 _busdStakesAmount) public onlyOwner {
@@ -289,10 +390,17 @@ contract Fund is Ownable, ReentrancyGuard {
   }
 
   function _fundPool(uint256 _poolId, uint256 _tokenamount) internal {
-    pools[_poolId].funded += _tokenamount;
+    uint256 fee1 = _tokenamount * 20 / 100;
+    uint256 fee2 = _tokenamount * 20 / 100;
+    uint256 tokenamount = _tokenamount - fee1 - fee2;
+
+    pools[_poolId].funded += tokenamount;
     busd.transferFrom(msg.sender, address(this), _tokenamount);
+
+    busd.transfer(fundFeeWallet, fee1);
+    busd.transfer(fundWallet, fee2);
     
-    emit PoolFunded(_poolId, _tokenamount);
+    emit PoolFunded(_poolId, tokenamount);
   }
 
   function startVoting(uint256 _poolId) public onlyOwner {
