@@ -62,7 +62,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     }
     
     /**
-     * @dev Initialises the staking
+     * @dev Initializes the staking
      */
     function initStaking() public onlyOwner {
         require(!initialised, "Already initialized");

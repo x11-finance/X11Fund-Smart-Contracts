@@ -255,7 +255,11 @@ contract Fund is Ownable, ReentrancyGuard {
     return tokenId;
   }
 
-  /// Call only when the contract is funded
+  /**
+   * @dev Updates the reward
+   * @notice Call only when the contract is funded
+   * @param _tokenId The id of the token
+   */
   function updateReward(uint256 _tokenId) public {
     uint256 poolId = x721.getPoolId(_tokenId);
     uint256 totalStakedInCurrentPool = stakedInThePool[poolId];
@@ -292,6 +296,11 @@ contract Fund is Ownable, ReentrancyGuard {
     emit RevenueWithdrawn(poolId, block.timestamp, msg.sender, _tokenId);
   }
 
+
+  /**
+   * @dev Returns votes for a particular pool
+   * @param _poolId The id of the pool
+   */
   function getVotes(uint256 _poolId) public view returns (uint256) {
     uint256 totalVotes = 0;
     for (uint256 i = 0; i < votes.length; i++) {
@@ -302,6 +311,12 @@ contract Fund is Ownable, ReentrancyGuard {
     return totalVotes;
   }
 
+  /**
+   * @dev Casts a vote for a pool with the token
+   * @param _poolId The id of the pool
+   * @param _vote The vote
+   * @param _tokenId The id of the token
+   */
   function castVote(uint256 _poolId, bool _vote, uint256 _tokenId) public {
     require (_canVote(msg.sender, _poolId), "Not eligible for voting");
     require (votings[_poolId].isActive, "Voting finished");
@@ -368,7 +383,12 @@ contract Fund is Ownable, ReentrancyGuard {
     emit EmergencyWithdrawn(_poolId, block.timestamp);
   }*/
 
-  /// Call only when the pool is funded
+  /**
+   * @dev Emergency withdraws rewards to admin wallet
+   * @notice Call only when the pool is funded
+   * @param _poolId The id of the pool
+   * @param _busdStakesAmount The amount of stakes
+   */
   function emergencyWithdrawRewardsToAdmin(uint256 _poolId, uint256 _busdStakesAmount) public onlyOwner {
     require(pools[_poolId].funded >= 0);
 
@@ -383,7 +403,11 @@ contract Fund is Ownable, ReentrancyGuard {
     emit EmergencyWithdrawn(_poolId, block.timestamp);
   }
 
-  /// Fund pool with BUSD
+  /**
+   * @dev Funds pool with BUSD
+   * @param _poolId The id of the pool
+   * @param _tokenamount The amount of BUSD
+   */
   function fundPool(uint256 _poolId, uint256 _tokenamount) public onlyOwner {
     require(_tokenamount <= GetBUSDAllowance(), "Please approve tokens before transferring.");
     _fundPool(_poolId, _tokenamount);
@@ -403,10 +427,19 @@ contract Fund is Ownable, ReentrancyGuard {
     emit PoolFunded(_poolId, tokenamount);
   }
 
+  /**
+   * @dev Starts voting for a pool
+   * @param _poolId The id of the pool
+   */
   function startVoting(uint256 _poolId) public onlyOwner {
     votings.push(Voting(_poolId, true));
   }
 
+  /**
+   * @dev Stops voting for a pool
+   * @param _poolId The id of the pool
+   * @param _votingsAmount The amount of votings
+   */
   function closeVoting(uint256 _poolId, uint256 _votingsAmount) public onlyOwner {
     for (uint256 i = 0; i < _votingsAmount; i++) {
       if (votings[i].poolId == _poolId) {
@@ -415,6 +448,12 @@ contract Fund is Ownable, ReentrancyGuard {
     }
   }
 
+  /**
+   * @dev Closes the pool
+   * @param _poolId The id of the pool
+   * @param _busdStakesAmount The amount of busd stakes in a pool
+   * @param _totalStakedInPool The total amount of staked tokens in a pool
+   */
   function closePool(uint256 _poolId, uint256 _busdStakesAmount, uint256 _totalStakedInPool) public onlyOwner {
     require(pools[_poolId].funded > 0, "Please fund the pool first.");
  
