@@ -92,7 +92,7 @@ contract("X721", function (accounts) {
     return assert.equal(poolId.toString(), "1");
   });
 
-  it("can retrive balance of tokens of a user and can trace the owner", async function () {
+  it("can trace the owner", async function () {
     await this.token.mintNFT(deployerAddress, 0, 20000, {
       from: accounts[0],
     });
@@ -106,10 +106,10 @@ contract("X721", function (accounts) {
     const balance = await this.token.balanceOf(accounts[0]);
     const owner = await this.token.ownerOf(tokenId);
 
-    const balanceXUSD = await this.token.getBalanceInPool(0);
+    // const balanceXUSD = await this.token.getBalanceInPool(0);
 
     assert.equal(balance.toNumber(), 2);
-    assert.equal(balanceXUSD, 20000);
+    // assert.equal(balanceXUSD, 20000);
     return assert.equal(owner, accounts[0]);
   });
 
@@ -133,5 +133,54 @@ contract("X721", function (accounts) {
 
     assert.equal(balance.toNumber(), 1);
     return assert.equal(owner, accounts[1]);
+  });
+
+  it("should return the correct token URI", async function () {
+    const tx = await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+    const tokenId = tx.logs[0].args.tokenId;
+    const tokenURI = await this.token.tokenURI(tokenId);
+
+    return assert.equal(
+      tokenURI,
+      "data:application/json;base64,eyJuYW1lIjogInhVU0QiLCAiZGVzY3JpcHRpb24iOiAiQSB0b2tlbiByZXByZXNlbnRpbmcgdGhlIHN0YWtlLiIsICJhdHRyaWJ1dGVzOiIgWyJwb29sSWQiOjAidG9rZW5BbW91bnQiOjEwMDAwXX0="
+    );
+  });
+
+  it("should revert on safeMint()", async function () {
+    await truffleAssert.fails(this.token.safeMint(deployerAddress));
+  });
+
+  it("should support the ERC721Enumerable interface", async function () {
+    await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+    await this.token.mintNFT(deployerAddress, 0, 10000, {
+      from: accounts[0],
+    });
+
+    const totalSupply = await this.token.totalSupply();
+    const tokenByIndex = await this.token.tokenByIndex(0);
+    const tokenOfOwnerByIndex = await this.token.tokenOfOwnerByIndex(
+      deployerAddress,
+      0
+    );
+
+    assert.equal(totalSupply.toNumber(), 2);
+    assert.equal(tokenByIndex.toNumber(), 1);
+    return assert.equal(tokenOfOwnerByIndex.toNumber(), 1);
+  });
+
+  it("should support the parent interfaces", async function () {
+    const supportsERC165 = await this.token.supportsInterface("0x01ffc9a7");
+    const supportsERC721 = await this.token.supportsInterface("0x80ac58cd");
+    const supportsERC721Enumerable = await this.token.supportsInterface(
+      "0x780e9d63"
+    );
+
+    assert.equal(supportsERC165, true);
+    assert.equal(supportsERC721, true);
+    return assert.equal(supportsERC721Enumerable, true);
   });
 });

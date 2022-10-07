@@ -300,5 +300,27 @@ contract("ERC721Staking", function (accounts) {
     return assert.equal("164.38356", web3.utils.fromWei(reward, "ether"));
   });
 
+  it("should return the proper investment tier for a given token", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[0], 1, 3000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    let tier = await this.pool.getInvestmentTier(tokenId);
+
+    assert.equal(tier.toString(), "13698630");
+
+    let tx2 = await this.xUSD.mintNFT(accounts[0], 1, 50000, {
+      from: accounts[0],
+    });
+    const { logs: logs2 } = tx2;
+    const tokenId2 = logs2[1].args.tokenId;
+
+    let tier2 = await this.pool.getInvestmentTier(tokenId2);
+
+    return assert.equal(tier2.toString(), "54794520");
+  });
+
   //it("should distribute rewards to multiple stakers", async function () {});
 });

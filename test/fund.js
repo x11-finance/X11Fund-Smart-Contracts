@@ -43,7 +43,7 @@ contract("Fund", function (accounts) {
       "2022-07-13",
       "2022-07-30"
     );
-    let pool = await this.instance.getPoolInfoAdmin(0);
+    let pool = await this.instance.getPoolInfo(0);
 
     await this.instance.addPool(
       1,
@@ -153,6 +153,7 @@ contract("Fund", function (accounts) {
 
     this.instance.setAdminWallet(accounts[1]);
     this.instance.setFeeWallet(accounts[2]);
+    this.instance.setFundWallet(accounts[3]);
 
     await this.busd.approve(
       this.instance.address,
@@ -233,28 +234,6 @@ contract("Fund", function (accounts) {
     );
   });
 
-  it("shouldn't allow non-admin to start voting", async function () {
-    await truffleAssert.reverts(
-      this.instance.startVoting(0, { from: accounts[2] })
-    );
-  });
-
-  it("should allow members to vote", async function () {
-    await this.instance.startVoting(0, { from: accounts[0] });
-
-    await this.instance.castVote(0, true, 1, { from: accounts[0] });
-
-    let votes = await this.instance.getVotes(0);
-
-    return assert.equal(votes.toNumber(), 1);
-  });
-
-  it("shouldn't allow non-members to vote", async function () {
-    return truffleAssert.fails(
-      this.instance.castVote(0, true, { from: accounts[1] })
-    );
-  });
-
   it("should fund the pool", async function () {
     let unfunded = await this.busd.balanceOf(this.instance.address);
     await this.busd.approve(
@@ -270,16 +249,10 @@ contract("Fund", function (accounts) {
     return assert.equal(diff, web3.utils.toWei("6000.0", "ether"));
   });
 
-  it("shouldn't allow members to vote when the voting is closed", async function () {
-    let votingsAmount = await this.instance.getVotingsAmount();
-    await this.instance.closeVoting(0, votingsAmount, { from: accounts[0] });
-    truffleAssert.fails(this.instance.castVote(0, true, { from: accounts[0] }));
-  });
-
   it("should calculate, update and distribute the rewards", async function () {
     let balanceBefore = await this.busd.balanceOf(accounts[0]);
 
-    await this.instance.updateReward(tokenId);
+    // await this.instance.updateReward(tokenId);
     await this.instance.ApproveBUSD(
       web3.utils.toWei("1000000000000000.0", "ether")
     );
@@ -308,5 +281,73 @@ contract("Fund", function (accounts) {
         from: accounts[0],
       })
     );
+  });
+
+  it("should correctly calculate how much is staked in pool", async function () {
+    let balance = await this.instance.getTotalStakedInPool(0);
+    return assert.equal(balance.toString(), "4900000000000000000000");
+  });
+
+  it("should correctly calculate how much is invested in all pools", async function () {
+    let total = await this.instance.getTotalInvestment();
+    return assert.equal(total.toString(), "9800000000000000000000");
+  });
+
+  it("should count how much stakers in the pool", async function () {
+    let count = await this.instance.getStakersInThePool(0);
+    return assert.equal(count.toString(), "1");
+  });
+
+  it("should trace the holder in a pool", async function () {
+    let holder = await this.instance.isHolderInPool(0, accounts[0]);
+    let holder2 = await this.instance.isHolderInPool(0, accounts[1]);
+    assert.equal(holder2, -1);
+    return assert.equal(holder.toString(), 0);
+  });
+
+  it("should count total BUSD stakes", async function () {
+    let count = await this.instance.getTotalBUSDStakes();
+    return assert.equal(count.toString(), 2);
+  });
+
+  it("should count total init [X11] stakes", async function () {
+    let count = await this.instance.getTotalInitStakes();
+    return assert.equal(count.toString(), 2);
+  });
+
+  it("should emergency wihdraw funds to Admin", async function () {
+    await this.busd.approve(
+      this.instance.address,
+      web3.utils.toWei("10000.0", "ether"),
+      { from: accounts[0] }
+    );
+    await this.instance.fundPool(0, web3.utils.toWei("10000.0", "ether"));
+    let balanceBefore = await this.busd.balanceOf(accounts[0]);
+    await this.instance.emergencyWithdrawRewardsToAdmin();
+    let balanceAfter = await this.busd.balanceOf(accounts[0]);
+    let diff = balanceAfter.sub(balanceBefore);
+
+    return assert.equal(diff.toString(), "6000000000000000000000");
+  });
+
+  it("should close the pool[0]", async function () {
+    await this.busd.approve(
+      this.instance.address,
+      web3.utils.toWei("10000.0", "ether"),
+      { from: accounts[0] }
+    );
+    await this.instance.fundPool(0, web3.utils.toWei("10000.0", "ether"));
+
+    let totalBUSDStakes = await this.instance.getTotalBUSDStakes();
+    let totalBUSDStaked = await this.instance.getTotalStakedInPool(0);
+
+    let res = await this.instance.closePool(
+      0,
+      totalBUSDStakes,
+      totalBUSDStaked
+    );
+    let poolInfo = await this.instance.getPoolInfo(0);
+
+    return assert.equal(poolInfo.isActive, false);
   });
 });

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
@@ -14,7 +13,7 @@ import "./X721.sol";
  * @title ERC721Staking
  * @dev ERC721Staking is a contract for staking ERC721 tokens.
  */
-contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
+contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     struct Stake {
@@ -23,7 +22,6 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         uint256 balance;
         uint256 rewards;
         uint256 claimedRewards;
-        address from;
     }
     mapping (address => Stake) stakes;
     mapping (uint256 => address) tokenOwner;
@@ -37,16 +35,15 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     IERC20 public rewardToken;
     uint256 public totalStaked;
     uint256 public x11RateToUSD;
-    uint256 constant stakingTime = 1 days;
-    uint256 constant token = 10e18;
+    uint256 constant STAKING_TIME = 1 days;
 
     /* ========== EVENTS ========== */
 
     event RewardAdded(uint256 reward);
-    event Staked(address indexed user, uint256 amount, uint256 tokenId);
-    event Unstaked(address indexed user, uint256 tokenId);
+    event Staked(address indexed user, uint256 amount, uint256 indexed tokenId);
+    event Unstaked(address indexed user, uint256 indexed tokenId);
     event RewardPaid(address indexed user, uint256 reward);
-    event EmergencyUnstake(address indexed user, uint256 tokenId);
+    event EmergencyUnstake(address indexed user, uint256 indexed tokenId);
     event ClaimableStatusUpdated(bool isEnabled);
 
     /* ========== METHODS ========== */
@@ -56,7 +53,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
      * @param _stakedToken The address of the staked token
      * @param _rewardToken The address of the reward token
      */
-    constructor(address _stakedToken, address _rewardToken) {
+    constructor(address _stakedToken, address _rewardToken) public {
         stakedToken = X721(_stakedToken);
         rewardToken = IERC20(_rewardToken);   
     }
@@ -74,7 +71,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
      * @dev Updates the claimable status
      * @param _isEnabled The status of the claimability
      */
-    function setTokensClaimable(bool _isEnabled) public onlyOwner {
+    function setTokensClaimable(bool _isEnabled) external onlyOwner {
         tokensClaimable = _isEnabled;
         emit ClaimableStatusUpdated(_isEnabled);
     }
@@ -144,10 +141,6 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
      * @param _tokenId The id of the token
      */
     function emergencyUnstake(uint256 _tokenId) public {
-        require(
-            tokenOwner[_tokenId] == msg.sender,
-            "nft._unstake: Sender must have staked tokenID"
-        );
         _unstake(msg.sender, _tokenId);
         emit EmergencyUnstake(msg.sender, _tokenId);
     }
@@ -162,10 +155,22 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         Stake storage __stake = stakes[_user];
 
         uint256 lastIndex = __stake.tokenIds.length - 1;
-        uint256 lastIndexKey = __stake.tokenIds[lastIndex];
 
         if (__stake.tokenIds.length > 0) {
-            __stake.tokenIds.pop();
+            for (uint256 i = 0; i < __stake.tokenIds.length; i++) {
+                if (__stake.tokenIds[i] == _tokenId) {
+                  // Remove the token from the array
+                    __stake.tokenIds[lastIndex] = __stake.tokenIds[i];
+                    __stake.since[lastIndex] = __stake.since[i];
+                    for (uint256 j = i; j < __stake.tokenIds.length - 1; j++) {
+                        __stake.tokenIds[j] = __stake.tokenIds[j + 1];
+                        __stake.since[j] = __stake.since[j + 1];
+                    }
+                    __stake.tokenIds.pop();
+                    __stake.since.pop();
+                    __stake.balance -= stakedToken.peggedAmount(_tokenId);
+                }
+            }    
         }
        
         if(__stake.balance == 0) {
@@ -185,7 +190,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
     * @param _tokenId The id of the token
     * @return The daily reward percentage
     */
-    function getInvestmentTier(uint256 _tokenId) internal view returns (uint256) {
+    function getInvestmentTier(uint256 _tokenId) public view returns (uint256) {
         uint256 peggedAmount = stakedToken.peggedAmount(_tokenId);
         if (peggedAmount < 5000) { 
             return uint256(5) * uint256(10e8) / uint256(365); 
@@ -200,7 +205,6 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         } else if (peggedAmount >= 70000) {
             return uint256(30) * uint256(10e8) / uint256(365);
         } 
-        return uint256(0);
     }
 
     /**
@@ -211,7 +215,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable, Pausable {
         Stake storage __stake = stakes[_user];
         uint256[] storage ids = __stake.tokenIds;
         for (uint256 j = 0; j < ids.length; j++) {
-            uint256 stakedDays = ((block.timestamp - uint(__stake.since[j]))) / stakingTime;
+            uint256 stakedDays = ((block.timestamp - uint(__stake.since[j]))) / STAKING_TIME;
             uint256 tier = getInvestmentTier(ids[j]);
             if (j == 0) {
                 __stake.rewards = 0;

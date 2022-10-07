@@ -7,12 +7,14 @@
   },
   "devDependencies": {
     "@openzeppelin/truffle-upgrades": "^1.15.0",
-    "truffle": "^5.5.14",
+    "ganache": "7.0.0",
+    "solidity-coverage": "0.7.4",
     "truffle-plugin-verify": "^0.5.27"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.6.0",
     "@truffle/hdwallet-provider": "^2.0.9",
-    "truffle-assertions": "^0.9.2"
+    "truffle-assertions": "^0.9.2",
+    "truffle-contract-size": "^2.0.1"
   }
 }

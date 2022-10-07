@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./X721.sol";
 
 /**
@@ -10,17 +11,12 @@ import "./X721.sol";
  * @dev The main Fund contract.
  */
 contract Fund is Ownable, ReentrancyGuard {
-  struct Company{
-    string index;
-    string name;
-  }
-
+  /* ========== STATE VARIABLES ========== */
   struct Stake {
     address from;
     uint256 tokenamount;
     uint256 since;
     uint256 poolId;
-    uint256 rewards;
     uint256 claimedRewards;
   }
 
@@ -29,7 +25,6 @@ contract Fund is Ownable, ReentrancyGuard {
   struct BUSDStake {
     address from;
     uint256 tokenamount;
-    uint256 since;
     uint256 poolId;
     uint256 rewards;
     uint256 claimedRewards;
@@ -47,23 +42,6 @@ contract Fund is Ownable, ReentrancyGuard {
     string setStarts;
     string setEnds;
   }
-
-  struct Vote {
-    address from;
-    uint256 poolId;
-    bool vote;
-  }
-
-  struct Voting {
-    uint256 poolId;
-    bool isActive;
-  }
-
-  struct CanVote {
-    uint256 poolId;
-    uint256 since;
-    bool isTrue;
-  }
   
   uint256 internal constant initStakePeriod = 30 days;
 
@@ -72,15 +50,11 @@ contract Fund is Ownable, ReentrancyGuard {
   X721 x721;
 
   mapping (uint256 => Stake[]) initStakes; // poolId => Stake[]
-  mapping (address => CanVote[]) canVote;
 
   uint256 totalInitStakes = 0;
 
   mapping (uint256 => uint256) stakersInThePool;
   mapping (uint256 => uint256) stakedInThePool;
-
-  Voting[] votings;
-  Vote[] votes;
    
   Pool[] public pools;
   BUSDStake[] busdStakes; 
@@ -95,15 +69,15 @@ contract Fund is Ownable, ReentrancyGuard {
 
   /* ========== EVENTS ========== */
 
-  event Staked(address indexed user, uint256 tokenId, uint256 amount, uint256 poolIndex, uint256 indexInPool, uint256 timestamp);
-  event StakedInit(address indexed user, uint256 amount, uint256 poolIndex, uint256 indexInPool, uint256 timestamp);
-  event Unstaked(address indexed user, uint256 amount, uint256 poolIndex, uint256 timestamp);
-  event UnstakedInit(address indexed user, uint256 amount, uint256 poolIndex, uint256 timestamp);
-  event EmergencyWithdrawn(uint256 poolIndex, uint256 timestamp);
-  event RevenueWithdrawn(uint256 poolIndex, uint256 timestamp, address to, uint256 tokenId);
-  event PoolFunded(uint256 poolId, uint256 tokenamount);
-  event PoolCreated(uint256 poolId, string name, string description, string companies, string setStarts, string setEnds);
-  event RewardUpdated(uint256 poolId, uint256 tokenId); 
+  event Staked(address indexed user, uint256 indexed tokenId, uint256 amount, uint256 indexed poolIndex, uint256 indexInPool, uint256 timestamp);
+  event StakedInit(address indexed user, uint256 amount, uint256 indexed poolIndex, uint256 indexInPool, uint256 timestamp);
+  event Unstaked(address indexed user, uint256 amount, uint256 indexed poolIndex, uint256 timestamp);
+  event UnstakedInit(address indexed user, uint256 amount, uint256 indexed poolIndex, uint256 timestamp);
+  event EmergencyWithdrawn(uint256 timestamp);
+  event RevenueWithdrawn(uint256 indexed poolIndex, uint256 timestamp, address to, uint256 indexed tokenId);
+  event PoolFunded(uint256 indexed poolId, uint256 tokenamount);
+  event PoolCreated(uint256 indexed poolId, string name, string description, string companies, string setStarts, string setEnds);
+  event RewardUpdated(uint256 indexed poolId, uint256 indexed tokenId); 
   event RewardsUpdated();
 
   /* ========== METHODS ========== */
@@ -114,7 +88,7 @@ contract Fund is Ownable, ReentrancyGuard {
    * @param _busd The address of BUSD token
    * @param _x721 The address of X721 token
    */
-  constructor(address _token, address _busd, address _x721) {
+  constructor(address _token, address _busd, address _x721) public {
     token = IERC20(_token);
     busd = IERC20(_busd);
     x721 = X721(_x721);
@@ -148,15 +122,6 @@ contract Fund is Ownable, ReentrancyGuard {
   }
 
   /**
-   * @dev Returns the pool info (admin only)
-   * @param _i The id of the pool
-   * @return The pool info
-   */
-  function getPoolInfoAdmin(uint _i) public view onlyOwner returns (Pool memory) {
-    return pools[_i];
-  }
-
-  /**
    * @dev Adds stakeholder to the pool
    * @param _poolId The id of the pool
    * @param _tokenamount The amount of tokens to stake
@@ -176,7 +141,7 @@ contract Fund is Ownable, ReentrancyGuard {
    * @return The status of the operation
    */
   function _addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) internal returns(bool) {
-    initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0, 0));
+    initStakes[_poolId].push(Stake(msg.sender, _tokenamount, block.timestamp, _poolId, 0));
     totalInitStakes++;
     staker[msg.sender][_poolId] = true;
     token.transferFrom(msg.sender, address(this), _tokenamount);
@@ -241,9 +206,8 @@ contract Fund is Ownable, ReentrancyGuard {
     busd.transfer(fundFeeWallet, fee);
     busd.transfer(adminWallet, tokenamount);
 
-    canVote[msg.sender].push(CanVote(_poolId, block.timestamp, true));
     uint256 tokenId = x721.mintNFT(msg.sender, _poolId, _tokenamount);
-    busdStakes.push(BUSDStake(msg.sender, tokenamount, block.timestamp, _poolId, 0, 0, tokenId));
+    busdStakes.push(BUSDStake(msg.sender, tokenamount, _poolId, 0, 0, tokenId));
     tokenToStake[tokenId] = busdStakes[busdStakes.length - 1];
 
     stakersInThePool[_poolId]++;
@@ -260,11 +224,9 @@ contract Fund is Ownable, ReentrancyGuard {
    * @notice Call only when the contract is funded
    * @param _tokenId The id of the token
    */
-  function updateReward(uint256 _tokenId) public {
+  function updateReward(uint256 _tokenId) internal {
     uint256 poolId = x721.getPoolId(_tokenId);
     uint256 totalStakedInCurrentPool = stakedInThePool[poolId];
-    address stakerAdr = x721.ownerOf(_tokenId);
-    uint256 stakedAmount = x721.peggedAmount(_tokenId); 
     BUSDStake storage stake = tokenToStake[_tokenId];
 
     uint256 part = stake.tokenamount * 10e8 / totalStakedInCurrentPool;
@@ -279,13 +241,11 @@ contract Fund is Ownable, ReentrancyGuard {
    * @param _tokenId The id of the token
    */
   function withdrawBUSDRewardWithToken(uint256 _tokenId) public nonReentrant {
+    updateReward(_tokenId);
     uint256 poolId = x721.getPoolId(_tokenId);
     require(pools[poolId].funded >= 0);
     require(x721.ownerOf(_tokenId) == msg.sender);
 
-    uint256 totalStakedInCurrentPool = stakedInThePool[poolId];
-    address stakerAdr = x721.ownerOf(_tokenId);
-    uint256 stakedAmount = x721.peggedAmount(_tokenId);
     BUSDStake storage stake = tokenToStake[_tokenId];
 
     uint256 unclaimedReward = stake.rewards - stake.claimedRewards;
@@ -294,41 +254,6 @@ contract Fund is Ownable, ReentrancyGuard {
     busd.transfer(stake.from, unclaimedReward);
 
     emit RevenueWithdrawn(poolId, block.timestamp, msg.sender, _tokenId);
-  }
-
-
-  /**
-   * @dev Returns votes for a particular pool
-   * @param _poolId The id of the pool
-   */
-  function getVotes(uint256 _poolId) public view returns (uint256) {
-    uint256 totalVotes = 0;
-    for (uint256 i = 0; i < votes.length; i++) {
-      if (votes[i].poolId == _poolId && votes[i].vote) {
-        totalVotes++;
-      }
-    }
-    return totalVotes;
-  }
-
-  /**
-   * @dev Casts a vote for a pool with the token
-   * @param _poolId The id of the pool
-   * @param _vote The vote
-   * @param _tokenId The id of the token
-   */
-  function castVote(uint256 _poolId, bool _vote, uint256 _tokenId) public {
-    require (_canVote(msg.sender, _poolId), "Not eligible for voting");
-    require (votings[_poolId].isActive, "Voting finished");
-    require (x721.getPoolId(_tokenId) == _poolId);
-    require (x721.ownerOf(_tokenId) == msg.sender);
-
-    _castVote(_poolId, _vote);
-  } 
-
-  function _castVote(uint256 _poolId, bool _vote) internal {
-    votes.push(Vote(msg.sender, _poolId, _vote));
-    canVote[msg.sender][_poolId].isTrue = false;
   }
 
   /* ========== ADMIN METHODS ========== */
@@ -386,21 +311,13 @@ contract Fund is Ownable, ReentrancyGuard {
   /**
    * @dev Emergency withdraws rewards to admin wallet
    * @notice Call only when the pool is funded
-   * @param _poolId The id of the pool
-   * @param _busdStakesAmount The amount of stakes
    */
-  function emergencyWithdrawRewardsToAdmin(uint256 _poolId, uint256 _busdStakesAmount) public onlyOwner {
-    require(pools[_poolId].funded >= 0);
+  function emergencyWithdrawRewardsToAdmin() public onlyOwner {
+    require(busd.balanceOf(address(this)) > 0);
 
-    for (uint256 i = 0; i < _busdStakesAmount; i++) {
-      if (busdStakes[i].poolId == _poolId) {
-        uint256 unclaimedReward = busdStakes[i].rewards - busdStakes[i].claimedRewards;
-        busdStakes[i].claimedRewards += unclaimedReward;
-        busd.transferFrom(address(this), msg.sender, unclaimedReward);
-      }
-    }
-    pools[_poolId].funded = 0;
-    emit EmergencyWithdrawn(_poolId, block.timestamp);
+    busd.transfer(msg.sender, busd.balanceOf(address(this)));
+
+    emit EmergencyWithdrawn(block.timestamp);
   }
 
   /**
@@ -428,27 +345,6 @@ contract Fund is Ownable, ReentrancyGuard {
   }
 
   /**
-   * @dev Starts voting for a pool
-   * @param _poolId The id of the pool
-   */
-  function startVoting(uint256 _poolId) public onlyOwner {
-    votings.push(Voting(_poolId, true));
-  }
-
-  /**
-   * @dev Stops voting for a pool
-   * @param _poolId The id of the pool
-   * @param _votingsAmount The amount of votings
-   */
-  function closeVoting(uint256 _poolId, uint256 _votingsAmount) public onlyOwner {
-    for (uint256 i = 0; i < _votingsAmount; i++) {
-      if (votings[i].poolId == _poolId) {
-        votings[i].isActive = false;
-      }
-    }
-  }
-
-  /**
    * @dev Closes the pool
    * @param _poolId The id of the pool
    * @param _busdStakesAmount The amount of busd stakes in a pool
@@ -462,7 +358,8 @@ contract Fund is Ownable, ReentrancyGuard {
         busdStakes[i].tokenamount -= 2 * busdStakes[i].tokenamount / 100;
         uint256 part = busdStakes[i].tokenamount * 10e8 / _totalStakedInPool;
         uint256 cashout = pools[i].funded * part / 10e8;
-        busd.transferFrom(address(this), busdStakes[i].from, cashout);
+        pools[_poolId].funded -= cashout;
+        //busd.transfer(busdStakes[i].from, cashout);
       }
     }
 
@@ -483,23 +380,6 @@ contract Fund is Ownable, ReentrancyGuard {
     return busdStakes.length;
   }
 
-  function getVotingsAmount() public view returns (uint256) {
-    return votings.length;
-  }
-
-  function getVotesAmount() public view returns (uint256) {
-    return votes.length;
-  }
-
-  function _canVote(address _user, uint256 _poolId) public view returns (bool) {
-    for (uint256 i = 0; i < canVote[_user].length; i++) {
-      if (canVote[_user][i].poolId == _poolId) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /// Returns pool id or -1
   function isHolderInPool(uint256 _poolId, address _holder) public view returns(int256) {
     for (uint256 i = 0; i < initStakes[_poolId].length; i++) {
@@ -511,14 +391,14 @@ contract Fund is Ownable, ReentrancyGuard {
   }
 
   /// Returns pool id or -1
-  function isTokenInPool(uint256 _poolId, uint256 _tokenId) public view returns(int256) {
+  /*function isTokenInPool(uint256 _poolId, uint256 _tokenId) public view returns(int256) {
     for (uint256 i = 0; i < busdStakes.length; i++) {
       if (busdStakes[i].tokenId == _tokenId) {
         return int(i);
       }
     }
     return -1;
-  }
+  }*/
 
   function getTotalStakedInPool(uint256 _poolId) public view returns (uint256) {
     return stakedInThePool[_poolId];
@@ -534,26 +414,15 @@ contract Fund is Ownable, ReentrancyGuard {
 
   /* ========== UTILITY METHODS ========== */
 
-  function GetUserTokenBalance() public view returns(uint256) { 
-    return token.balanceOf(msg.sender);
-  } 
-   
-  function ApproveTokens(uint256 _tokenamount) public returns(bool) {
-    token.approve(address(this), _tokenamount);
-    return true;
-  }
+
    
   function GetAllowance() public view returns(uint256) {
     return token.allowance(msg.sender, address(this));
   }
-    
-  function GetContractTokenBalance() public onlyOwner view returns(uint256) {
-    return token.balanceOf(address(this));
-  }
 
   function GetUserBUSDBalance() public view returns(uint256) { 
     return busd.balanceOf(msg.sender);
-  } 
+  }
    
   function ApproveBUSD(uint256 _tokenamount) public returns(bool) {
     busd.approve(address(this), _tokenamount);
@@ -564,8 +433,8 @@ contract Fund is Ownable, ReentrancyGuard {
     return busd.allowance(msg.sender, address(this));
   }
     
-  function GetContractBUSDBalance() public onlyOwner view returns(uint256) {
+  /*function GetContractBUSDBalance() public onlyOwner view returns(uint256) {
     return busd.balanceOf(address(this));
-  }
+  }*/
 
 }
