@@ -21,7 +21,7 @@ contract X721 is ERC721Enumerable, ERC721URIStorage, ERC721Burnable, AccessContr
         uint256 amount;
     }
     mapping(uint256 => Metadata2) tokensData; // id => data
-    uint256[] tokens;
+    //uint256[] tokens;
 
     /* ========== EVENTS ========== */
 
@@ -38,8 +38,7 @@ contract X721 is ERC721Enumerable, ERC721URIStorage, ERC721Burnable, AccessContr
     }
 
     // SHOULD NOT BE USED
-    function safeMint(address to) public {
-        require(1 == 10, "Doesn't work with this token.");
+    function safeMint(address to) internal {
     }
 
     // The following function is override required by Solidity.
@@ -72,7 +71,7 @@ contract X721 is ERC721Enumerable, ERC721URIStorage, ERC721Burnable, AccessContr
         _tokenIdCounter.increment();
         uint256 newItemId = _tokenIdCounter.current();
         tokensData[newItemId] = Metadata2(_poolId, _amount);
-        tokens.push(newItemId);
+        //tokens.push(newItemId);
 
         _mint(_client, newItemId);
 
@@ -132,13 +131,5 @@ contract X721 is ERC721Enumerable, ERC721URIStorage, ERC721Burnable, AccessContr
     function _burn(uint256 _tokenId) internal override(ERC721, ERC721URIStorage) {
         super._burn(_tokenId);
         delete tokensData[_tokenId];
-        // remove token from array
-        for (uint i = 0; i < tokens.length; i++) {
-            if (tokens[i] == _tokenId) {
-                tokens[i] = tokens[tokens.length - 1];
-                tokens.pop();
-                break;
-            }
-        }
     }
 }

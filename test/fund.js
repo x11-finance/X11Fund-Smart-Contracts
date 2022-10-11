@@ -74,6 +74,31 @@ contract("Fund", function (accounts) {
     );
   });
 
+  it("should not allow to add an init stake without approval", async function () {
+    truffleAssert.reverts(
+      this.instance.addStakeHolderInPool(
+        0,
+        web3.utils.toWei("6000.0", "ether"),
+        { from: accounts[0] }
+      )
+    );
+  });
+
+  it("should not allow to add an init stake of less than 6000 X11", async function () {
+    await this.token.approve(
+      this.instance.address,
+      web3.utils.toWei("3000.0", "ether"),
+      { from: accounts[0] }
+    );
+    truffleAssert.reverts(
+      this.instance.addStakeHolderInPool(
+        0,
+        web3.utils.toWei("3000.0", "ether"),
+        { from: accounts[0] }
+      )
+    );
+  });
+
   it("should allow the user to add an init stake", async function () {
     let balance = await this.token.balanceOf(accounts[0]);
 
@@ -134,6 +159,17 @@ contract("Fund", function (accounts) {
     truffleAssert.fails(this.instance.claimInitStakeFromPool(0, idInPool));
   });
 
+  it("should not allow to withdraw init stake from wrong address", async function () {
+    const snapShot = await helpers.takeSnapshot();
+    const snapshotId = snapShot["result"];
+    await helpers.advanceTimeAndBlock(SECONDS_IN_DAY * 30);
+    let idInPool = await this.instance.isHolderInPool(0, accounts[0]);
+    await truffleAssert.reverts(
+      this.instance.claimInitStakeFromPool(0, idInPool, { from: accounts[1] })
+    );
+    await helpers.revertToSnapShot(snapshotId);
+  });
+
   it("should allow to withdraw init stake after a month has passed", async function () {
     const snapShot = await helpers.takeSnapshot();
     const snapshotId = snapShot["result"];
@@ -146,6 +182,27 @@ contract("Fund", function (accounts) {
     await helpers.revertToSnapShot(snapshotId);
 
     assert.equal(newBalance.toString(), "9999994000000000000000000000");
+  });
+
+  it("should not allow the user to add a BUSD stake without approval", async function () {
+    truffleAssert.reverts(
+      this.instance.addBUSDStakeInPool(0, web3.utils.toWei("5000.0", "ether"), {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should not allow to add a BUSD stake smaller than 1000 BUSD", async function () {
+    await this.busd.approve(
+      this.instance.address,
+      web3.utils.toWei("500.0", "ether"),
+      { from: accounts[0] }
+    );
+    truffleAssert.reverts(
+      this.instance.addBUSDStakeInPool(0, web3.utils.toWei("500.0", "ether"), {
+        from: accounts[0],
+      })
+    );
   });
 
   it("should allow the user to add a BUSD stake", async function () {
@@ -234,6 +291,31 @@ contract("Fund", function (accounts) {
     );
   });
 
+  it("should not withraw reward if the pool is not funded", async function () {
+    await truffleAssert.reverts(
+      this.instance.withdrawBUSDRewardWithToken(tokenId, {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("should not close the pool if it is not funded", async function () {
+    let totalBUSDStakes = await this.instance.getTotalBUSDStakes();
+    let totalBUSDStaked = await this.instance.getTotalStakedInPool(0);
+
+    await truffleAssert.reverts(
+      this.instance.closePool(0, totalBUSDStakes, totalBUSDStaked)
+    );
+  });
+
+  it("should not fund a pool without approval", async function () {
+    await truffleAssert.reverts(
+      this.instance.fundPool(0, web3.utils.toWei("5000.0", "ether"), {
+        from: accounts[0],
+      })
+    );
+  });
+
   it("should fund the pool", async function () {
     let unfunded = await this.busd.balanceOf(this.instance.address);
     await this.busd.approve(
@@ -247,6 +329,14 @@ contract("Fund", function (accounts) {
     let funded = await this.busd.balanceOf(this.instance.address);
     let diff = funded - unfunded;
     return assert.equal(diff, web3.utils.toWei("6000.0", "ether"));
+  });
+
+  it("should not withdraw reward if the address is wrong", async function () {
+    await truffleAssert.reverts(
+      this.instance.withdrawBUSDRewardWithToken(tokenId, {
+        from: accounts[1],
+      })
+    );
   });
 
   it("should calculate, update and distribute the rewards", async function () {
@@ -315,6 +405,12 @@ contract("Fund", function (accounts) {
     return assert.equal(count.toString(), 2);
   });
 
+  it("should not emergency withdraw if the pool is not funded", async function () {
+    await truffleAssert.reverts(
+      this.instance.emergencyWithdrawRewardsToAdmin()
+    );
+  });
+
   it("should emergency wihdraw funds to Admin", async function () {
     await this.busd.approve(
       this.instance.address,
@@ -337,10 +433,8 @@ contract("Fund", function (accounts) {
       { from: accounts[0] }
     );
     await this.instance.fundPool(0, web3.utils.toWei("10000.0", "ether"));
-
     let totalBUSDStakes = await this.instance.getTotalBUSDStakes();
     let totalBUSDStaked = await this.instance.getTotalStakedInPool(0);
-
     let res = await this.instance.closePool(
       0,
       totalBUSDStakes,
@@ -349,5 +443,67 @@ contract("Fund", function (accounts) {
     let poolInfo = await this.instance.getPoolInfo(0);
 
     return assert.equal(poolInfo.isActive, false);
+  });
+
+  it("shouldn't allow to add a BUSD stake in the closed pool", async function () {
+    await this.busd.approve(
+      this.instance.address,
+      web3.utils.toWei("5000.0", "ether"),
+      { from: accounts[0] }
+    );
+    await truffleAssert.reverts(
+      this.instance.addBUSDStakeInPool(0, web3.utils.toWei("5000.0", "ether"), {
+        from: accounts[0],
+      })
+    );
+  });
+
+  it("shouldn't allow to add a init stake in the closed pool", async function () {
+    await this.token.approve(
+      this.instance.address,
+      web3.utils.toWei("6000.0", "ether"),
+      { from: accounts[0] }
+    );
+
+    await truffleAssert.reverts(
+      this.instance.addStakeHolderInPool(
+        0,
+        web3.utils.toWei("6000.0", "ether"),
+        { from: accounts[0] }
+      )
+    );
+  });
+
+  it("shouldn't allow to add an init stake into non-existent pool", async function () {
+    await this.token.approve(
+      this.instance.address,
+      web3.utils.toWei("6000.0", "ether"),
+      { from: accounts[0] }
+    );
+
+    await truffleAssert.reverts(
+      this.instance.addStakeHolderInPool(
+        5,
+        web3.utils.toWei("6000.0", "ether"),
+        { from: accounts[0] }
+      )
+    );
+  });
+
+  it("shouldn't allow to withdraw a BUSD stake in the closed pool", async function () {
+    await truffleAssert.reverts(
+      this.instance.withdrawBUSDRewardWithToken(tokenId, { from: accounts[0] })
+    );
+  });
+
+  it("shouldn't allow to withdraw an init stake in the closed pool", async function () {
+    let idInPool = await this.instance.isHolderInPool(0, accounts[0]);
+    await truffleAssert.reverts(
+      this.instance.claimInitStakeFromPool(0, idInPool)
+    );
+  });
+
+  it("should not allow to claim init stake from another pool", async function () {
+    await truffleAssert.fails(this.instance.claimInitStakeFromPool(0, -1));
   });
 });

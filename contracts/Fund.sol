@@ -128,6 +128,7 @@ contract Fund is Ownable, ReentrancyGuard {
    * @return The status of the operation
    */
   function addStakeHolderInPool(uint256 _poolId, uint256 _tokenamount) public returns(bool) {
+    require(pools[_poolId].isActive, "Pool is not active");
     require(_tokenamount <= GetAllowance(), "Please approve tokens before transferring.");
     require(_tokenamount >= 6000000000000000000000, "6000 is necessary to open the pool.");
     require(staker[msg.sender][_poolId] == false, "You've already staked in this pool.");
@@ -156,10 +157,10 @@ contract Fund is Ownable, ReentrancyGuard {
    * @return The status of the operation
    */
   function claimInitStakeFromPool(uint256 _poolId, uint256 _idInPool) public returns(bool) {
-    require(_idInPool >= 0, "You're not in this pool!");
-    require(initStakes[_poolId][uint256(_idInPool)].since + initStakePeriod <= block.timestamp, "You can unstake in 1 month only");
+    // require(_idInPool >= 0, "You're not in this pool!");
     require(initStakes[_poolId][uint256(_idInPool)].from == msg.sender);
-    require(initStakes[_poolId][uint256(_idInPool)].claimedRewards == 0);
+    require(initStakes[_poolId][uint256(_idInPool)].since + initStakePeriod <= block.timestamp, "You can unstake in 1 month only");
+    // require(initStakes[_poolId][uint256(_idInPool)].claimedRewards == 0);
 
     return _claimInitStakeFromPool(_poolId, _idInPool);
   }
@@ -243,7 +244,7 @@ contract Fund is Ownable, ReentrancyGuard {
   function withdrawBUSDRewardWithToken(uint256 _tokenId) public nonReentrant {
     updateReward(_tokenId);
     uint256 poolId = x721.getPoolId(_tokenId);
-    require(pools[poolId].funded >= 0);
+    require(pools[poolId].funded > 0);
     require(x721.ownerOf(_tokenId) == msg.sender);
 
     BUSDStake storage stake = tokenToStake[_tokenId];

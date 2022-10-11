@@ -75,7 +75,9 @@ contract("X721", function (accounts) {
       from: accounts[0],
     });
     const tokenId = tx.logs[0].args.tokenId;
-    await truffleAssert.fails(this.token.burn(tokenId, { from: accounts[1] }));
+    await truffleAssert.reverts(
+      this.token.burn(tokenId, { from: accounts[1] })
+    );
   });
 
   it("can trace the token contents", async function () {
@@ -146,10 +148,6 @@ contract("X721", function (accounts) {
       tokenURI,
       "data:application/json;base64,eyJuYW1lIjogInhVU0QiLCAiZGVzY3JpcHRpb24iOiAiQSB0b2tlbiByZXByZXNlbnRpbmcgdGhlIHN0YWtlLiIsICJhdHRyaWJ1dGVzOiIgWyJwb29sSWQiOjAidG9rZW5BbW91bnQiOjEwMDAwXX0="
     );
-  });
-
-  it("should revert on safeMint()", async function () {
-    await truffleAssert.fails(this.token.safeMint(deployerAddress));
   });
 
   it("should support the ERC721Enumerable interface", async function () {

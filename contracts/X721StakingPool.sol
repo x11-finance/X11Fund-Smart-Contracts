@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./X721.sol";
 
@@ -17,16 +16,14 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     struct Stake {
-        uint256[] tokenIds;
-        uint256[] since;
+        uint256 since;
         uint256 balance;
         uint256 rewards;
         uint256 claimedRewards;
+        address from;
     }
-    mapping (address => Stake) stakes;
-    mapping (uint256 => address) tokenOwner;
-    uint256[] stakedTokens;
-    address[] users;
+    mapping (uint256 => Stake) stakes; // tokenId => Stake
+
     bool public tokensClaimable;
     bool initialised;
     uint256 stakingStartTime;
@@ -77,21 +74,12 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Returns the staked tokens of a user
-     * @param _user The address of the user
-     * @return tokenIds staked tokens of the user (array)
-     */
-    function getStakedTokens(address _user) public view returns (uint256[] memory tokenIds) {
-        return stakes[_user].tokenIds;
-    }
-
-    /**
      * @dev Returns the owner of the staked token
      * @param _tokenId The id of the token
      * @return owner The address of the user
      */
     function getStakedTokenOwner(uint256 _tokenId) public view returns (address owner) {
-        return tokenOwner[_tokenId];
+        return stakes[_tokenId].from;
     }
 
     /**
@@ -111,18 +99,19 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
      * @param _tokenId The id of the token
      */
     function _stake(address _user, uint256 _tokenId) internal {
-        Stake storage __stake = stakes[_user];
-        __stake.tokenIds.push(_tokenId);
-        __stake.since.push(block.timestamp);
+        Stake memory __stake = Stake({
+            since: block.timestamp,
+            balance: 0,
+            rewards: 0,
+            claimedRewards: 0,
+            from: _user
+        });
+        stakes[_tokenId] = __stake;
        
-        if(__stake.tokenIds.length <= 1) {
-            __stake.balance = 0;
-        }
         __stake.balance += stakedToken.peggedAmount(_tokenId);
-        tokenOwner[_tokenId] = _user;
+        
         stakedToken.safeTransferFrom(_user, address(this), _tokenId);
-        stakedTokens.push(_tokenId); 
-        users.push(_user);
+ 
         totalStaked++;   
         emit Staked(_user, 1, _tokenId);
     }
@@ -132,7 +121,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
      * @param _tokenId The id of the token
      */
     function unstake(uint256 _tokenId) public nonReentrant {
-        claimReward(msg.sender);
+        claimReward(_tokenId);
         _unstake(msg.sender, _tokenId);
     }
 
@@ -151,38 +140,14 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
      * @param _tokenId The id of the token
      */
     function _unstake(address _user, uint256 _tokenId) internal {
-        require(tokenOwner[_tokenId] == _user, "User must own the token.");
-        Stake storage __stake = stakes[_user];
-
-        uint256 lastIndex = __stake.tokenIds.length - 1;
-
-        if (__stake.tokenIds.length > 0) {
-            for (uint256 i = 0; i < __stake.tokenIds.length; i++) {
-                if (__stake.tokenIds[i] == _tokenId) {
-                  // Remove the token from the array
-                    __stake.tokenIds[lastIndex] = __stake.tokenIds[i];
-                    __stake.since[lastIndex] = __stake.since[i];
-                    for (uint256 j = i; j < __stake.tokenIds.length - 1; j++) {
-                        __stake.tokenIds[j] = __stake.tokenIds[j + 1];
-                        __stake.since[j] = __stake.since[j + 1];
-                    }
-                    __stake.tokenIds.pop();
-                    __stake.since.pop();
-                    __stake.balance -= stakedToken.peggedAmount(_tokenId);
-                }
-            }    
-        }
+        require(stakes[_tokenId].from == _user, "User must own the token.");
        
-        if(__stake.balance == 0) {
-            delete stakes[_user];
-        }
-        delete tokenOwner[_tokenId];
+        delete stakes[_tokenId];
 
         stakedToken.safeTransferFrom(address(this), _user, _tokenId);
         totalStaked--;
 
         emit Unstaked(_user, _tokenId);
-
     }
 
     /*
@@ -204,53 +169,47 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
             return uint256(20) * uint256(10e8) / uint256(365);
         } else if (peggedAmount >= 70000) {
             return uint256(30) * uint256(10e8) / uint256(365);
-        } 
-    }
-
-    /**
-     * @dev Calculates the reward for a user
-     * @param _user The address of the user
-     */
-    function updateReward(address _user) public {
-        Stake storage __stake = stakes[_user];
-        uint256[] storage ids = __stake.tokenIds;
-        for (uint256 j = 0; j < ids.length; j++) {
-            uint256 stakedDays = ((block.timestamp - uint(__stake.since[j]))) / STAKING_TIME;
-            uint256 tier = getInvestmentTier(ids[j]);
-            if (j == 0) {
-                __stake.rewards = 0;
-            }
-            uint256 tokenRewards = stakedToken.peggedAmount(ids[j]) * stakedDays 
-                * tier * 10e18 * 10e7 / (x11RateToUSD * 100); 
-            __stake.rewards += tokenRewards; 
         }
     }
 
     /**
-     * @dev Returns the reward for a user
-     * @param _user The address of the user
+     * @dev Calculates the reward for a user
+     * @param _tokenId The id of the token
      */
-    function getReward(address _user) public view returns (uint256) {
-        Stake storage __stake = stakes[_user];
-        return __stake.rewards;
+    function updateReward(uint256 _tokenId) public {
+        uint256 stakedDays = ((block.timestamp - uint(stakes[_tokenId].since))) / STAKING_TIME;
+        uint256 tier = getInvestmentTier(_tokenId);
+    
+        uint256 tokenRewards = stakedToken.peggedAmount(_tokenId) * stakedDays 
+            * tier * 10e18 * 10e7 / (x11RateToUSD * 100); 
+        stakes[_tokenId].rewards += tokenRewards; 
+    }
+
+    /**
+     * @dev Returns the reward for a user
+     * @param _tokenId The id of the token
+     */
+    function getReward(uint256 _tokenId) public view returns (uint256) {
+        return stakes[_tokenId].rewards;
     }
     
     /** 
      * @dev Claim reward for the user
-     * @param _user Address of the user
+     * @param _tokenId Id of the token
      * @return reward Amount of reward claimed
      */
-    function claimReward(address _user) public returns (uint256) {
-        uint256 unclaimedReward = stakes[_user].rewards - stakes[_user].claimedRewards;
+    function claimReward(uint256 _tokenId) public returns (uint256) {
+        uint256 unclaimedReward = stakes[_tokenId].rewards - stakes[_tokenId].claimedRewards;
         require(tokensClaimable == true, "Tokens cannnot be claimed yet");
         require(unclaimedReward > 0 , "0 rewards yet");
         require(rewardToken.balanceOf(address(this)) >= unclaimedReward, "Not enough tokens in the contract");
-        require(_user == msg.sender, "User must be the same as msg.sender");
-        require(rewardToken.transfer(_user, unclaimedReward), "Transfer failed");
+        require(stakes[_tokenId].from == msg.sender, "User must be the same as msg.sender");
+        
+        rewardToken.transfer(stakes[_tokenId].from, unclaimedReward);
 
-        stakes[_user].claimedRewards += unclaimedReward;
+        stakes[_tokenId].claimedRewards += unclaimedReward;
 
-        emit RewardPaid(_user, unclaimedReward);
+        emit RewardPaid(stakes[_tokenId].from, unclaimedReward);
         return unclaimedReward;
     }
 
