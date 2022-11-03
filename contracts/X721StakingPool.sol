@@ -23,6 +23,7 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
         address from;
     }
     mapping (uint256 => Stake) stakes; // tokenId => Stake
+    mapping (address => mapping(uint256 => uint256)) public stakerToPoolToToken; // user => pool => tokenId
 
     bool public tokensClaimable;
     bool initialised;
@@ -111,6 +112,9 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
         __stake.balance += stakedToken.peggedAmount(_tokenId);
         
         stakedToken.safeTransferFrom(_user, address(this), _tokenId);
+
+        uint256 poolId = stakedToken.getPoolId(_tokenId);
+        stakerToPoolToToken[_user][poolId] = _tokenId;
  
         totalStaked++;   
         emit Staked(_user, 1, _tokenId);
@@ -219,5 +223,9 @@ contract ERC721Staking is ERC721Holder, ReentrancyGuard, Ownable {
      */
     function setRateToUSD(uint256 _rate) public onlyOwner {
         x11RateToUSD = _rate;
+    }
+
+    function getTokenId(address _user, uint256 _poolId) public view returns (uint256) {
+        return stakerToPoolToToken[_user][_poolId];
     }
 }

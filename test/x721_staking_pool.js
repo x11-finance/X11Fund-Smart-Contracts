@@ -634,4 +634,20 @@ contract("ERC721Staking", function (accounts) {
     let claimable = await this.pool.tokensClaimable();
     assert.equal(claimable, false);
   });
+
+  it("should return the correct token id", async function () {
+    let tx = await this.xUSD.mintNFT(accounts[1], 0, 50000, {
+      from: accounts[0],
+    });
+    const { logs } = tx;
+    const tokenId = logs[1].args.tokenId;
+
+    await this.xUSD.approve(this.pool.address, tokenId, { from: accounts[1] });
+    await this.pool.stake(tokenId, {
+      from: accounts[1],
+    });
+
+    let id = await this.pool.getTokenId(accounts[1], 0);
+    assert.equal(id.toString(), tokenId.toString());
+  });
 });

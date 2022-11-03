@@ -1,5 +1,6 @@
 const X721 = artifacts.require("X721");
 const truffleAssert = require("truffle-assertions");
+2;
 
 /*
  * uncomment accounts to access the test accounts made available by the
@@ -166,8 +167,8 @@ contract("X721", function (accounts) {
     );
 
     assert.equal(totalSupply.toNumber(), 2);
-    assert.equal(tokenByIndex.toNumber(), 1);
-    return assert.equal(tokenOfOwnerByIndex.toNumber(), 1);
+    assert.equal(tokenByIndex.toNumber(), 2);
+    return assert.equal(tokenOfOwnerByIndex.toNumber(), 2);
   });
 
   it("should support the parent interfaces", async function () {

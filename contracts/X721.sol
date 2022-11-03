@@ -68,6 +68,10 @@ contract X721 is ERC721Enumerable, ERC721URIStorage, ERC721Burnable, AccessContr
     function mintNFT(address _client, uint256 _poolId, uint256 _amount) public returns (uint256) {
         require(hasRole(MINTER_ROLE, msg.sender), "Caller is not a minter");
         
+        if (_tokenIdCounter.current() == 0) {
+            _tokenIdCounter.increment();
+        }
+
         _tokenIdCounter.increment();
         uint256 newItemId = _tokenIdCounter.current();
         tokensData[newItemId] = Metadata2(_poolId, _amount);

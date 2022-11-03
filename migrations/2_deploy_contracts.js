@@ -4,6 +4,9 @@ const X11 = artifacts.require("X11");
 const BUSD = artifacts.require("BUSD");
 const X721 = artifacts.require("X721");
 
+const X11ADDRESS = "0x12446a71FCedB10AdfD275A1BC78D69Ac3450d2a";
+const BUSDADDRESS = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56";
+
 module.exports = async function (deployer) {
   await deployer.deploy(X11);
   await deployer.deploy(X721);
